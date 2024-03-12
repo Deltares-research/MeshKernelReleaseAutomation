@@ -1,0 +1,13 @@
+<Project>
+	<PropertyGroup>
+		<Company>Deltares</Company>
+		<Copyright>Copyright © Deltares 2023</Copyright>
+		<Product>$(MSBuildProjectName)</Product>
+		<AssemblyTitle>$(MSBuildProjectName)</AssemblyTitle>
+
+		<BuildNumber>0</BuildNumber>
+		<MeshKernelReleaseAutomationVersion>4.1.0</MeshKernelReleaseAutomationVersion>
+		<Version>$(MeshKernelReleaseAutomationVersion).$(BuildNumber)</Version>
+		<FileVersion>$(Version)</FileVersion>
+	</PropertyGroup>
+</Project>

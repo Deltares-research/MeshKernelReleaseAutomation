@@ -118,8 +118,6 @@ if __name__ == "__main__":
 
     try:
         args = parse_args()
-        print(type(args.dir_packages_props_file))
-        print(type(args.to_versioned_packages))
         bump_dependencies_versions(
             args.dir_packages_props_file, args.to_versioned_packages
         )
