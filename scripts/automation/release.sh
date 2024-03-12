@@ -2,10 +2,43 @@
 
 set -x
 
-version=$1
-github_token_path=$2
+script=$0
+function usage {
+    echo "Usage: $script --version string --base_branch string --github_token string "
+    echo "Creates a new release"
+    echo ""
+    echo "  --version        string   Version of new release"
+    echo "  --base_branch    string   Base branch"
+    echo "  --github_token   string   Path to github token"
+    echo ""
+}
 
-base_branch=main
+while [ $# -gt 0 ]; do
+    if [[ $1 == "--help" ]]; then
+        usage
+        exit 0
+    elif [[ $1 == "--"* ]]; then
+        v="${1/--/}"
+        declare "$v"="$2"
+        shift
+    fi
+    shift
+done
+
+function die {
+    printf "Script failed: %s\n" "$1"
+    usage
+    exit 1
+}
+
+if [[ -z $version ]]; then
+    die "Missing parameter --version"
+elif [[ -z $base_branch ]]; then
+    die "Missing parameter --base_branch"
+elif [[ -z $github_token ]]; then
+    die "Missing parameter --github_token"
+fi
+
 tag=v${version}
 release_branch=release/${tag}
 
@@ -16,9 +49,8 @@ nuspec_file=${root_dir}/nuget/MeshKernelReleaseAutomation.nuspec
 dir_build_props_file=${root_dir}/Directory.Build.props
 dir_package_rops_file=${root_dir}/Directory.Packages.props
 
-
 # login
-gh auth login --with-token < ${github_token_path}
+gh auth login --with-token < ${github_token}
 
 # fetch master and create the release branch
 git fetch origin ${base_branch}
