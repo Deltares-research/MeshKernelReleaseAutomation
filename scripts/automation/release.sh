@@ -73,7 +73,8 @@ gh auth login --with-token < ${gh_token}
 
 # fetch master and create the release branch
 git fetch origin ${base_branch}
-git checkout -b ${release_branch} ${base_branch}
+git checkout -B ${release_branch} ${base_branch}
+
 
 # update version of python bindings
 python ${scripts_dir}/bump_mkpy_versions.py \
