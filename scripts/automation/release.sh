@@ -74,6 +74,7 @@ gh auth login --with-token < ${gh_token}
 # fetch master and create the release branch
 git fetch origin ${base_branch}
 git checkout -B ${release_branch} ${base_branch}
+git push -f origin ${release_branch}
 
 
 # update version of python bindings
