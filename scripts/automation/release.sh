@@ -85,6 +85,7 @@ gh pr create \
 --title "Release ${tag}" \
 --fill
 
+sleep ${refresh_interval}
 gh pr checks ${release_branch} --watch --interval ${refresh_interval} || error "Checks failed"
 
 # update product version
@@ -97,6 +98,7 @@ git add ${nuspec_file} ${dir_build_props_file}
 git commit -m 'update product version'
 git push -u origin ${release_branch}
 
+sleep ${refresh_interval}
 gh pr checks ${release_branch} --watch --interval ${refresh_interval} || error "Checks failed"
 
 # update versions of dependencies
@@ -111,6 +113,7 @@ git add ${dir_package_props_file}
 git commit -m 'Update dependencies versions'
 git push -u origin ${release_branch}
 
+sleep ${refresh_interval}
 gh pr checks ${release_branch} --watch --interval ${refresh_interval} || error "Checks failed"
 
 # create tagged release from the release branch, set title same as tag, autogenerate the release notes and make set it to latest
