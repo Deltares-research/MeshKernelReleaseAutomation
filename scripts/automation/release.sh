@@ -13,7 +13,7 @@ function usage {
     echo "  --base_branch                  Required  string   Base branch"
     echo "  --gh_token                     Required  string   Path to github token"
     echo "  --gh_refresh_interval          Optional  integer  Refresh interval in seconds used while watching github PR checks, default = 30s"
-    echo "  --pre_pr_check_wait_duration   Optional  integer  Wait duration in seconds before watching github PR checks"
+    echo "  --pre_pr_check_wait_duration   Optional  integer  Wait duration in seconds before watching github PR checks, default = 30s"
     echo ""
 }
 
