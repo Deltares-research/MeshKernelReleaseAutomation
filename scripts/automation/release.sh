@@ -26,6 +26,11 @@ error() {
   exit $exit_code
 }
 
+function delete_branches {
+    git branch -D ${release_branch}
+    git push origin --delete ${release_branch}
+}
+
 while [ $# -gt 0 ]; do
     if [[ $1 == "--help" ]]; then
         usage
@@ -54,7 +59,8 @@ root_dir=../..
 python_version_file=${root_dir}/python/version.py
 nuspec_file=${root_dir}/nuget/MeshKernelReleaseAutomation.nuspec
 dir_build_props_file=${root_dir}/Directory.Build.props
-dir_package_rops_file=${root_dir}/Directory.Packages.props
+dir_package_props_file=${root_dir}/Directory.Packages.props
+refresh_interval=30 # seconds
 
 # login
 gh auth login --with-token < ${github_token}
@@ -79,7 +85,7 @@ gh pr create \
 --title "Release ${tag}" \
 --fill
 
-gh pr checks ${release_branch} --watch || error "Checks failed"
+gh pr checks ${release_branch} --watch --interval ${refresh_interval} || error "Checks failed"
 
 # update product version
 python ${scripts_dir}/bump_package_version.py \
@@ -91,28 +97,28 @@ git add ${nuspec_file} ${dir_build_props_file}
 git commit -m 'update product version'
 git push -u origin ${release_branch}
 
-gh pr checks ${release_branch} --watch || error "Checks failed"
+gh pr checks ${release_branch} --watch --interval ${refresh_interval} || error "Checks failed"
 
 # update versions of dependencies
 python ${scripts_dir}/bump_dependencies_versions.py \
---dir_packages_props_file ${dir_package_rops_file} \
+--dir_packages_props_file ${dir_package_props_file} \
 --to_versioned_packages \
   "Deltares.MeshKernel:${version}  \
   Invalid:2666.09.13 \
   DHYDRO.SharedConfigurations:6.6.6.666 \
   NUnit:3.12.6"
-git add ${dir_package_rops_file}
+git add ${dir_package_props_file}
 git commit -m 'Update dependencies versions'
 git push -u origin ${release_branch}
 
-gh pr checks ${release_branch} --watch || error "Checks failed"
+gh pr checks ${release_branch} --watch --interval ${refresh_interval} || error "Checks failed"
 
 # create tagged release from the release branch, set title same as tag, autogenerate the release notes and make set it to latest
 gh release create ${tag} \
 --repo github.com/Deltares-research/MeshKernelReleaseAutomation \
 --target ${release_branch} \
 --title ${tag} \
---generate-notes  \
+--generate-notes \
 --latest
 
 # checkout the base branch, fetch everything, we care about the base branch and the latest release tag 
