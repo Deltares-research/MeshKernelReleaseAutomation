@@ -2,13 +2,18 @@
 
 set -x
 
+gh_refresh_interval=30 # seconds
+pre_pr_check_wait_duration=${refresh_interval}
+
 function usage {
-    echo "Usage: $0 --version string --base_branch string --github_token string "
+    echo "Usage: $0 --version string --base_branch string --gh_token string "
     echo "Creates a new release"
     echo ""
-    echo "  --version        string   Version of new release"
-    echo "  --base_branch    string   Base branch"
-    echo "  --github_token   string   Path to github token"
+    echo "  --version                      Required  string   Version of new release"
+    echo "  --base_branch                  Required  string   Base branch"
+    echo "  --gh_token                     Required  string   Path to github token"
+    echo "  --gh_refresh_interval          Optional  integer  Refresh interval in seconds used while watching github PR checks, default = 30s"
+    echo "  --pre_pr_check_wait_duration   Optional  integer  Wait duration in seconds before watching github PR checks"
     echo ""
 }
 
@@ -47,8 +52,8 @@ if [[ -z ${version} ]]; then
     die "Missing parameter --version"
 elif [[ -z ${base_branch} ]]; then
     die "Missing parameter --base_branch"
-elif [[ -z ${github_token} ]]; then
-    die "Missing parameter --github_token"
+elif [[ -z ${gh_token} ]]; then
+    die "Missing parameter --gb_token"
 fi
 
 tag=v${version}
@@ -60,10 +65,9 @@ python_version_file=${root_dir}/python/version.py
 nuspec_file=${root_dir}/nuget/MeshKernelReleaseAutomation.nuspec
 dir_build_props_file=${root_dir}/Directory.Build.props
 dir_package_props_file=${root_dir}/Directory.Packages.props
-refresh_interval=30 # seconds
 
 # login
-gh auth login --with-token < ${github_token}
+gh auth login --with-token < ${gh_token}
 
 # fetch master and create the release branch
 git fetch origin ${base_branch}
@@ -85,8 +89,8 @@ gh pr create \
 --title "Release ${tag}" \
 --fill
 
-sleep ${refresh_interval}
-gh pr checks ${release_branch} --watch --interval ${refresh_interval} || error "Checks failed"
+sleep ${pre_pr_check_wait_duration}
+gh pr checks ${release_branch} --watch --interval ${gh_refresh_interval} || error "Checks failed"
 
 # update product version
 python ${scripts_dir}/bump_package_version.py \
@@ -98,8 +102,8 @@ git add ${nuspec_file} ${dir_build_props_file}
 git commit -m 'update product version'
 git push -u origin ${release_branch}
 
-sleep ${refresh_interval}
-gh pr checks ${release_branch} --watch --interval ${refresh_interval} || error "Checks failed"
+sleep ${pre_pr_check_wait_duration}
+gh pr checks ${release_branch} --watch --interval ${gh_refresh_interval} || error "Checks failed"
 
 # update versions of dependencies
 python ${scripts_dir}/bump_dependencies_versions.py \
@@ -113,8 +117,8 @@ git add ${dir_package_props_file}
 git commit -m 'Update dependencies versions'
 git push -u origin ${release_branch}
 
-sleep ${refresh_interval}
-gh pr checks ${release_branch} --watch --interval ${refresh_interval} || error "Checks failed"
+sleep ${pre_pr_check_wait_duration}
+gh pr checks ${release_branch} --watch --interval ${gh_refresh_interval} || error "Checks failed"
 
 # create tagged release from the release branch, set title same as tag, autogenerate the release notes and make set it to latest
 gh release create ${tag} \
