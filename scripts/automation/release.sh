@@ -66,6 +66,8 @@ nuspec_file=${root_dir}/nuget/MeshKernelReleaseAutomation.nuspec
 dir_build_props_file=${root_dir}/Directory.Build.props
 dir_package_props_file=${root_dir}/Directory.Packages.props
 
+repo=github.com/Deltares-research/MeshKernelReleaseAutomation
+
 # login
 gh auth login --with-token < ${gh_token}
 
@@ -84,13 +86,18 @@ git push -u origin ${release_branch}
 
 # release has now diverged from the base branch, create a PR
 gh pr create \
+--repo ${repo} \
 --base ${base_branch} \
 --head ${release_branch} \
 --title "Release ${tag}" \
 --fill
 
 sleep ${pre_pr_check_wait_duration}
-gh pr checks ${release_branch} --watch --interval ${gh_refresh_interval} || error "Checks failed"
+gh pr checks ${release_branch} \
+--repo ${repo} \
+--watch \
+--interval ${gh_refresh_interval} \
+|| error "One or more checks failed"
 
 # update product version
 python ${scripts_dir}/bump_package_version.py \
@@ -103,7 +110,11 @@ git commit -m 'update product version'
 git push -u origin ${release_branch}
 
 sleep ${pre_pr_check_wait_duration}
-gh pr checks ${release_branch} --watch --interval ${gh_refresh_interval} || error "Checks failed"
+gh pr checks ${release_branch} \
+--repo ${repo} \
+--watch \
+--interval ${gh_refresh_interval} \
+|| error "One or more checks failed"
 
 # update versions of dependencies
 python ${scripts_dir}/bump_dependencies_versions.py \
@@ -118,11 +129,15 @@ git commit -m 'Update dependencies versions'
 git push -u origin ${release_branch}
 
 sleep ${pre_pr_check_wait_duration}
-gh pr checks ${release_branch} --watch --interval ${gh_refresh_interval} || error "Checks failed"
+gh pr checks ${release_branch} \
+--repo ${repo} \
+--watch \
+--interval ${gh_refresh_interval} \
+|| error "One or more checks failed"
 
 # create tagged release from the release branch, set title same as tag, autogenerate the release notes and make set it to latest
 gh release create ${tag} \
---repo github.com/Deltares-research/MeshKernelReleaseAutomation \
+--repo ${repo} \
 --target ${release_branch} \
 --title ${tag} \
 --generate-notes \
