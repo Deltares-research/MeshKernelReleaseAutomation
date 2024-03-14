@@ -30,16 +30,11 @@ function die {
 }
 
 error() {
-  # store last exit code before invoking any other command
-  local exit_code="$?"
-  # print error message
-  echo Error: "$1"
-  exit $exit_code
-}
-
-function delete_branches {
-    git branch -D ${release_branch}
-    git push origin --delete ${release_branch}
+    # store last exit code before invoking any other command
+    local exit_code="$?"
+    # print error message
+    echo Error: "$1"
+    exit $exit_code
 }
 
 while [ $# -gt 0 ]; do
@@ -59,7 +54,7 @@ if [[ -z ${version} ]]; then
 elif [[ -z ${base_branch} ]]; then
     die "Missing parameter --base_branch"
 elif [[ -z ${gh_token} ]]; then
-    die "Missing parameter --gb_token"
+    die "Missing parameter --gh_token"
 fi
 
 tag=v${version}
@@ -75,65 +70,64 @@ dir_package_props_file=${root_dir}/Directory.Packages.props
 repo=github.com/Deltares-research/MeshKernelReleaseAutomation
 
 # login
-gh auth login --with-token < ${gh_token}
+gh auth login --with-token <${gh_token}
 
-# fetch master and create the release branch
+# fetch master
 git fetch origin ${base_branch}
 git branch --contains ${commit_id} | grep --quiet ${base_branch}
 if [ $? -eq 0 ]; then
     git checkout -B ${release_branch} ${commit_id}
 else
-    git checkout -B ${release_branch} ${base_branch}   
+    git checkout -B ${release_branch} ${base_branch}
 fi
 git push -f origin ${release_branch}
 
-
 # update version of python bindings
 python ${scripts_dir}/bump_mkpy_versions.py \
---file ${python_version_file} \
---to_version ${version} \
---to_backend_version ${version}
+    --file ${python_version_file} \
+    --to_version ${version} \
+    --to_backend_version ${version}
 git add ${python_version_file}
 git commit -m 'Update python bindings version'
 git push -u origin ${release_branch}
 
 # release has now diverged from the base branch, create a PR
 gh pr create \
---repo ${repo} \
---base ${base_branch} \
---head ${release_branch} \
---title "Release ${tag}" \
---fill
+    --repo ${repo} \
+    --base ${base_branch} \
+    --head ${release_branch} \
+    --title "Release ${tag}" \
+    --fill
 
 sleep ${wait}
 gh pr checks ${release_branch} \
---repo ${repo} \
---watch \
---interval ${gh_refresh_interval} \
-|| error "One or more checks failed"
+    --repo ${repo} \
+    --watch \
+    --interval ${gh_refresh_interval} ||
+    error "One or more checks failed"
 
 # update product version
 python ${scripts_dir}/bump_package_version.py \
---nuspec_file ${nuspec_file} \
---dir_build_props_file ${dir_build_props_file} \
---version_tag "MeshKernelReleaseAutomationVersion" \
---to_version ${version}
+    --nuspec_file ${nuspec_file} \
+    --dir_build_props_file ${dir_build_props_file} \
+    --version_tag "MeshKernelReleaseAutomationVersion" \
+    --to_version ${version}
 git add ${nuspec_file} ${dir_build_props_file}
 git commit -m 'update product version'
 git push -u origin ${release_branch}
 
 sleep ${wait}
 gh pr checks ${release_branch} \
---repo ${repo} \
---watch \
---interval ${gh_refresh_interval} \
-|| error "One or more checks failed"
+    --repo ${repo} \
+    --watch \
+    --interval ${gh_refresh_interval} ||
+    error "One or more checks failed"
 
 # update versions of dependencies
 python ${scripts_dir}/bump_dependencies_versions.py \
---dir_packages_props_file ${dir_package_props_file} \
---to_versioned_packages \
-  "Deltares.MeshKernel:${version}  \
+    --dir_packages_props_file ${dir_package_props_file} \
+    --to_versioned_packages \
+    "Deltares.MeshKernel:${version} \
   Invalid:2666.09.13 \
   DHYDRO.SharedConfigurations:6.6.6.666 \
   NUnit:3.12.6"
@@ -143,20 +137,20 @@ git push -u origin ${release_branch}
 
 sleep ${wait}
 gh pr checks ${release_branch} \
---repo ${repo} \
---watch \
---interval ${gh_refresh_interval} \
-|| error "One or more checks failed"
+    --repo ${repo} \
+    --watch \
+    --interval ${gh_refresh_interval} ||
+    error "One or more checks failed"
 
 # create tagged release from the release branch, set title same as tag, autogenerate the release notes and make set it to latest
 gh release create ${tag} \
---repo ${repo} \
---target ${release_branch} \
---title ${tag} \
---generate-notes \
---latest
+    --repo ${repo} \
+    --target ${release_branch} \
+    --title ${tag} \
+    --generate-notes \
+    --latest
 
-# checkout the base branch, fetch everything, we care about the base branch and the latest release tag 
+# checkout the base branch, fetch everything, we care about the base branch and the latest release tag
 git checkout ${base_branch}
 git fetch --all
 git pull
