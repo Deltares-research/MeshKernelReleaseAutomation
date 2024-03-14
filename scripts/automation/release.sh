@@ -2,7 +2,6 @@
 
 set -x
 
-commit_id=
 gh_refresh_interval=30 # seconds
 wait=${refresh_interval}
 
@@ -12,7 +11,7 @@ function usage {
     echo ""
     echo "  --version              Required  string   Version of new release"
     echo "  --base_branch          Required  string   Base branch"
-    echo "  --commit_id            Optional  string   ID of commit check out"
+    echo "  --start_point          Required  string   ID of commit, branch or tag to check out"
     echo "                                            If provided, it should belong to the specified base branch. "
     echo "                                            Otherwise the HEAD of  the base branch is checked out."
     echo "  --gh_token             Required  string   Path to github token"
@@ -72,14 +71,23 @@ repo=github.com/Deltares-research/MeshKernelReleaseAutomation
 # login
 gh auth login --with-token <${gh_token}
 
-# fetch master
-git fetch origin ${base_branch}
-git branch --contains ${commit_id} | grep --quiet ${base_branch}
-if [ $? -eq 0 ]; then
-    git checkout -B ${release_branch} ${commit_id}
+if git show-ref --tags --verify --quiet -- refs/tags/${start_point} >/dev/null 2>&1; then
+    echo ${start_point} is a tag
+elif git show-ref --verify --quiet -- refs/heads/${start_point} >/dev/null 2>&1; then
+    echo ${start_point} is a branch
+elif git rev-parse --verify ${start_point}^{commit} >/dev/null 2>&1; then
+    echo ${start_point} is a commit
 else
-    git checkout -B ${release_branch} ${base_branch}
+    error ${start_point} is neither a commit ID, a tag, nor a branch
 fi
+
+# pull remote
+git pull origin ${start_point}
+
+# switch to release branch
+git checkout -B ${release_branch} ${start_point}
+
+# and immediately push it to remote
 git push -f origin ${release_branch}
 
 # update version of python bindings
@@ -155,8 +163,17 @@ git checkout ${base_branch}
 git fetch --all
 git pull
 
-# merge the tag into the base branch then push to remote
-git merge --no-ff ${tag}
+# merge the tag into the base branch then push to origin
+# merge conflicts can happen here!
+# for ex when someone on the base branch modified a line this auto release had modified...
+# auto-merge will fail which requires a merge tool as a first step.
+# Merge tools do no guarantee resolving all conflicts automatically. Manual work becomes necessary... Abort or...
+# - If releasing from the head of master, do it or schedule it at an ungodly hour and hope your teammates aren't nocturnal.
+#   Chances of failure will be close to none. This will be the case most of the time.
+# - Try to never release from a (very old) commit
+# - If releasing from an existing tag (usually done for patching old branches without rolling put new  features),
+#   this is where it gets tricky... I really can't think of a way to do this without
+git merge --no-ff ${tag} || error "Merge tag failed highly likely due to merge conflicts"
 git push -u origin ${base_branch}
 
 # log out
