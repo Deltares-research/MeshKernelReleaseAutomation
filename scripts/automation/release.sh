@@ -2,18 +2,24 @@
 
 set -x
 
+commit_id=
 gh_refresh_interval=30 # seconds
-pre_pr_check_wait_duration=${refresh_interval}
+wait=${refresh_interval}
 
 function usage {
     echo "Usage: $0 --version string --base_branch string --gh_token string "
     echo "Creates a new release"
     echo ""
-    echo "  --version                      Required  string   Version of new release"
-    echo "  --base_branch                  Required  string   Base branch"
-    echo "  --gh_token                     Required  string   Path to github token"
-    echo "  --gh_refresh_interval          Optional  integer  Refresh interval in seconds used while watching github PR checks, default = 30s"
-    echo "  --pre_pr_check_wait_duration   Optional  integer  Wait duration in seconds before watching github PR checks, default = 30s"
+    echo "  --version              Required  string   Version of new release"
+    echo "  --base_branch          Required  string   Base branch"
+    echo "  --commit_id            Optional  string   ID of commit check out"
+    echo "                                            If provided, it should belong to the specified base branch. "
+    echo "                                            Otherwise the HEAD of  the base branch is checked out."
+    echo "  --gh_token             Required  string   Path to github token"
+    echo "  --gh_refresh_interval  Optional  integer  Refresh interval in seconds "
+    echo "                                            Used as a refresh interval while watching github PR checks, default = 30s"
+    echo "  --wait                 Optional  integer  Wait duration in seconds"
+    echo "                                            The script sleeps for this duration before watching github PR checks, default = 30s"
     echo ""
 }
 
@@ -73,7 +79,12 @@ gh auth login --with-token < ${gh_token}
 
 # fetch master and create the release branch
 git fetch origin ${base_branch}
-git checkout -B ${release_branch} ${base_branch}
+git branch --contains ${commit_id} | grep --quiet ${base_branch}
+if [ $? -eq 0 ]; then
+    git checkout -B ${release_branch} ${commit_id}
+else
+    git checkout -B ${release_branch} ${base_branch}   
+fi
 git push -f origin ${release_branch}
 
 
@@ -94,7 +105,7 @@ gh pr create \
 --title "Release ${tag}" \
 --fill
 
-sleep ${pre_pr_check_wait_duration}
+sleep ${wait}
 gh pr checks ${release_branch} \
 --repo ${repo} \
 --watch \
@@ -111,7 +122,7 @@ git add ${nuspec_file} ${dir_build_props_file}
 git commit -m 'update product version'
 git push -u origin ${release_branch}
 
-sleep ${pre_pr_check_wait_duration}
+sleep ${wait}
 gh pr checks ${release_branch} \
 --repo ${repo} \
 --watch \
@@ -130,7 +141,7 @@ git add ${dir_package_props_file}
 git commit -m 'Update dependencies versions'
 git push -u origin ${release_branch}
 
-sleep ${pre_pr_check_wait_duration}
+sleep ${wait}
 gh pr checks ${release_branch} \
 --repo ${repo} \
 --watch \
