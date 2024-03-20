@@ -52,6 +52,8 @@ if [[ -z ${version} ]]; then
     die "Missing parameter --version"
 elif [[ -z ${base_branch} ]]; then
     die "Missing parameter --base_branch"
+elif [[ -z ${start_point} ]]; then
+    die "Missing parameter --start_point"
 elif [[ -z ${gh_token} ]]; then
     die "Missing parameter --gh_token"
 fi
@@ -71,6 +73,7 @@ repo=github.com/Deltares-research/MeshKernelReleaseAutomation
 # login
 gh auth login --with-token <${gh_token}
 
+# determine the nature of the starting point
 if git show-ref --tags --verify --quiet -- refs/tags/${start_point} >/dev/null 2>&1; then
     echo ${start_point} is a tag
 elif git show-ref --verify --quiet -- refs/heads/${start_point} >/dev/null 2>&1; then
@@ -134,11 +137,7 @@ gh pr checks ${release_branch} \
 # update versions of dependencies
 python ${scripts_dir}/bump_dependencies_versions.py \
     --dir_packages_props_file ${dir_package_props_file} \
-    --to_versioned_packages \
-    "Deltares.MeshKernel:${version} \
-  Invalid:2666.09.13 \
-  DHYDRO.SharedConfigurations:6.6.6.666 \
-  NUnit:3.12.6"
+    --to_versioned_packages "Deltares.MeshKernel:${version}  Invalid:2666.09.13   DHYDRO.SharedConfigurations:6.6.6.666   NUnit:3.12.6"
 git add ${dir_package_props_file}
 git commit -m 'Update dependencies versions'
 git push -u origin ${release_branch}
@@ -150,7 +149,7 @@ gh pr checks ${release_branch} \
     --interval ${gh_refresh_interval} ||
     error "One or more checks failed"
 
-# create tagged release from the release branch, set title same as tag, autogenerate the release notes and make set it to latest
+# create tagged release from the release branch, set title same as tag, autogenerate the release notes and set it to latest
 gh release create ${tag} \
     --repo ${repo} \
     --target ${release_branch} \
