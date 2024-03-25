@@ -1,29 +1,13 @@
 #!/bin/bash
 
-# set -x
-
 set -e
+
+repo_host=github.com
+repo_owner=Deltares-research
 
 gh_refresh_interval=30 # seconds
 wait=${gh_refresh_interval}
-ERROR_MESSAGE=''
-
-function usage {
-    echo "Usage: $0 --version string --base_branch string --gh_token string "
-    echo "Creates a new release"
-    echo ""
-    echo "  --version              Required  string   Version of new release"
-    echo "  --base_branch          Required  string   Base branch"
-    echo "  --start_point          Required  string   ID of commit, branch or tag to check out"
-    echo "                                            If provided, it should belong to the specified base branch. "
-    echo "                                            Otherwise the HEAD of  the base branch is checked out."
-    echo "  --gh_token             Required  string   Path to github token"
-    echo "  --gh_refresh_interval  Optional  integer  Refresh interval in seconds "
-    echo "                                            Used as a refresh interval while watching github PR checks, default = 30s"
-    echo "  --wait                 Optional  integer  Wait duration in seconds"
-    echo "                                            The script sleeps for this duration before watching github PR checks, default = 30s"
-    echo ""
-}
+clean=false
 
 function catch() {
     local exit_code=$1
@@ -33,83 +17,90 @@ function catch() {
         echo "  Function : ${FUNCNAME[1]}"
         echo "  Command  : ${BASH_COMMAND}"
         echo "  Exit code: ${exit_code}"
-        if ! [ -z "$ERROR_MESSAGE" ]; then
-            echo "  Message  : ${ERROR_MESSAGE}"
-        fi
     fi
 }
 
 trap 'catch $?' EXIT
 
-function error() {
-    # store last exit code before invoking any other command
-    local exit_code="$?"
-    # print error message
-    echo Error: "$1"
-    exit $exit_code
+function usage {
+    echo "Usage: $0 --version string --base_branch string --gh_token string --gh_refresh_interval integer --wait integer"
+    echo "Creates a new release"
+    echo ""
+    echo "  --work_dir             Required  string   Path to work directory"
+    echo "  --version              Required  string   Version of new release"
+    echo "  --start_point          Required  string   ID of commit, branch or tag to check out"
+    echo "                                            If provided, it should belong to the specified base branch. "
+    echo "                                            Otherwise the HEAD of  the base branch is checked out."
+    echo "  --gh_token             Required  string   Path to github token"
+    echo "  --gh_refresh_interval  Optional  integer  Refresh interval in seconds "
+    echo "                                            Used as a refresh interval while watching github PR checks, default = 30s"
+    echo "  --wait                 Optional  integer  Wait duration in seconds"
+    echo "                                            The script sleeps for this duration before watching github PR checks, default = 30s"
+    echo "  --clean                Optional           If supplied, the working directory is removed. Otherwise, it is kept."
+    echo ""
 }
 
-function die {
-    printf "Script failed: %s\n" "$1"
-    usage
-    exit 1
-}
+# Define the parse_named_arguments function
+function parse_arguments() {
+    positional_args=()
+    while [[ $# -gt 0 ]]; do
+        case $1 in
+        --help)
+            usage
+            exit 0
+            ;;
+        --work_dir)
+            declare -g work_dir="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --version)
+            declare -g version="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --start_point)
+            declare -g start_point="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --gh_token)
+            declare -g gh_token="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --gh_refresh_interval)
+            declare -gi gh_refresh_interval="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --wait)
+            declare -gi wait="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --clean)
+            declare -g clean=true
+            shift # past argument
+            ;;
+        -* | --*)
+            echo "Unknown option $1"
+            usage
+            exit 1
+            ;;
+        *)
+            positional_args+=("$1") # save positional arg
+            shift                   # past argument
+            ;;
+        esac
+    done
 
-#function parse_args() {
-while [ $# -gt 0 ]; do
-    if [[ $1 == "--help" ]]; then
+    if ((${#positional_args[@]})); then
+        echo "Found positional arguments (${positional_args[@]}). Such arguments are not allowed. Only named arguments are valid."
         usage
-        exit 0
-    elif [[ $1 == "--"* ]]; then
-        v="${1/--/}"
-        declare -g "$v"="$2"
-        shift
-    fi
-    shift
-done
-#}
-
-#function check_args() {
-if [[ -z ${version} ]]; then
-    die "Missing parameter --version"
-elif [[ -z ${base_branch} ]]; then
-    die "Missing parameter --base_branch"
-elif [[ -z ${start_point} ]]; then
-    die "Missing parameter --start_point"
-elif [[ -z ${gh_token} ]]; then
-    die "Missing parameter --gh_token"
-fi
-#}
-
-function check_version() {
-    local version=$1
-    local pattern="^[0-9]+\.[0-9]+\.[0-9]+$"
-    if [[ $version =~ $pattern ]]; then
-        echo "Release version will be set to $version."
-    else
-        error "The string \"$version\" does not correspond to a semantic <major>.<minor>.<patch>."
+        exit 1
     fi
 }
-
-#parse_args
-echo version is ${version}
-#check_args
-check_version ${version}
-
-tag=v${version}
-release_branch=release/${tag}
-
-scripts_dir=.
-
-repo_host=github.com
-repo_owner=Deltares-research
-repo_name=MeshKernelReleaseAutomation
-work_dir=release
-
-python_version_file=${work_dir}/${repo_name}/python/version.py
-nuspec_file=${work_dir}/${repo_name}/nuget/MeshKernelReleaseAutomation.nuspec
-dir_build_props_file=${work_dir}/${repo_name}/Directory.Build.props
-dir_package_props_file=${work_dir}/${repo_name}/Directory.Packages.props
 
 function log_in() {
     gh auth login --with-token <${gh_token}
@@ -120,12 +111,13 @@ function log_out() {
 }
 
 function create_work_dir() {
-    mkdir -p ${work_dir}
-    rm -fr ${work_dir}/*
+    mkdir ${work_dir}
 }
 
-function clean() {
-    rm -fr ${work_dir}
+function remove_work_dir() {
+    if ${clean}; then
+        rm -fr ${work_dir}
+    fi
 }
 
 function get_gh_repo_path() {
@@ -144,6 +136,28 @@ function clone() {
     git clone ${repo_url} ${destination}
 }
 
+function check_version() {
+    local version=$1
+    local pattern="^[0-9]+\.[0-9]+\.[0-9]+$"
+    if [[ $version =~ $pattern ]]; then
+        echo "Release version will be set to $version."
+        return 0
+    else
+        echo "The string \"$version\" does not correspond to a semantic <major>.<minor>.<patch>."
+        return 1
+    fi
+}
+
+function check_time() {
+    local name=$1
+    local value=$2
+    if [[ $2 -le 0 ]]; then
+        echo "$1 must be a positive integer."
+        return 1
+    fi
+    return 0
+}
+
 function check_start_point() {
     local repo_name=$1
     local repo_path=$(get_local_repo_path ${repo_name})
@@ -156,8 +170,15 @@ function check_start_point() {
     elif git -C ${repo_path} rev-parse --verify ${start_point}^{commit} >/dev/null 2>&1; then
         echo Starting point is ${start_point}, which is a commit.
     else
-        error ${start_point} is neither a commit ID, a tag, nor a branch.
+        echo ${start_point} is neither a commit ID, a tag, nor a branch.
+        return 1
     fi
+    return 0
+}
+
+function check_target_tag() {
+    local tag=$1
+    git ls-remote --exit-code --tags origin ${tag} >/dev/null 2>&1
 }
 
 function create_release_branch() {
@@ -208,13 +229,13 @@ function create_pull_request() {
 
 function monitor_checks() {
     local repo_name=$1
+    local release_branch=$2
     local repo=$(get_gh_repo_path ${repo_name})
     sleep ${wait}
     gh pr checks ${release_branch} \
         --repo ${repo} \
         --watch \
-        --interval ${gh_refresh_interval} ||
-        error "One or more checks failed"
+        --interval ${gh_refresh_interval}
 }
 
 function create_release() {
@@ -253,11 +274,25 @@ function merge_release_tag_into_base_branch() {
     # - Try to never release from a (very old) commit
     # - If releasing from an existing tag (usually done for patching old branches without rolling put new  features),
     #   this is where it gets tricky... I really can't think of a way to do this without
-    git -C ${repo_path} merge --no-ff ${tag} || error "Merge tag failed highly likely due to merge conflicts"
+    git -C ${repo_path} merge --no-ff ${tag}
     git -C ${repo_path} push -u origin ${base_branch}
 }
 
 function main() {
+
+    ## remove
+    scripts_dir=.
+    repo_name=MeshKernelReleaseAutomation
+    ## remove
+
+    parse_arguments "$@"
+    check_version ${version}
+    check_time "gh_refresh_interval" ${gh_refresh_interval}
+    check_time "wait" ${wait}
+
+    tag=v${version}
+    release_branch=release/${tag}
+
     log_in
 
     create_work_dir
@@ -269,6 +304,7 @@ function main() {
     create_release_branch ${repo_name} ${release_branch} ${start_point}
 
     # update version of python bindings
+    python_version_file=${work_dir}/${repo_name}/python/version.py
     python ${scripts_dir}/bump_mkpy_versions.py \
         --file ${python_version_file} \
         --to_version ${version} \
@@ -279,9 +315,11 @@ function main() {
     # release has now diverged from the base branch, create a PR
     create_pull_request ${repo_name} ${release_branch} ${tag}
 
-    monitor_checks ${repo_name}
+    monitor_checks ${repo_name} ${release_branch}
 
     # update product version
+    nuspec_file=${work_dir}/${repo_name}/nuget/MeshKernelReleaseAutomation.nuspec
+    dir_build_props_file=${work_dir}/${repo_name}/Directory.Build.props
     python ${scripts_dir}/bump_package_version.py \
         --nuspec_file ${nuspec_file} \
         --dir_build_props_file ${dir_build_props_file} \
@@ -290,16 +328,17 @@ function main() {
 
     commit_and_push_changes ${repo_name} ${release_branch} "Auto-update version of product"
 
-    monitor_checks ${repo_name}
+    monitor_checks ${repo_name} ${release_branch}
 
     # update versions of dependencies
+    dir_package_props_file=${work_dir}/${repo_name}/Directory.Packages.props
     python ${scripts_dir}/bump_dependencies_versions.py \
         --dir_packages_props_file ${dir_package_props_file} \
         --to_versioned_packages "Deltares.MeshKernel:${version}  Invalid:2666.09.13   DHYDRO.SharedConfigurations:6.6.6.666   NUnit:3.12.6"
 
     commit_and_push_changes ${repo_name} ${release_branch} "Auto-update versions of dependencies"
 
-    monitor_checks ${repo_name}
+    monitor_checks ${repo_name} ${release_branch}
 
     # create tagged release from the release branch, set title same as tag, autogenerate the release notes and set it to latest
     create_release ${repo_name} ${release_branch} ${tag}
@@ -307,10 +346,11 @@ function main() {
     # merge the newly created release tag into the base branch
     merge_release_tag_into_base_branch ${repo_name} ${tag}
 
+    #clean
+    remove_work_dir
+
     # log out
     log_out
 }
 
-main
-
-# set +x
+main "$@"
