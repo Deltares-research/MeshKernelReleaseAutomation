@@ -136,19 +136,17 @@ function clone() {
     git clone ${repo_url} ${destination}
 }
 
-function check_version() {
+function check_version_string() {
     local version=$1
     local pattern="^[0-9]+\.[0-9]+\.[0-9]+$"
-    if [[ $version =~ $pattern ]]; then
-        echo "Release version will be set to $version."
-        return 0
-    else
-        echo "The string \"$version\" does not correspond to a semantic <major>.<minor>.<patch>."
+    if ! [[ $version =~ $pattern ]]; then
+        echo "The string \"$version\" does not correspond to a semantic of the form <major>.<minor>.<patch>."
         return 1
     fi
+    return 0
 }
 
-function check_time() {
+function check_time_value() {
     local name=$1
     local value=$2
     if [[ $2 -le 0 ]]; then
@@ -176,9 +174,50 @@ function check_start_point() {
     return 0
 }
 
-function check_target_tag() {
-    local tag=$1
-    git ls-remote --exit-code --tags origin ${tag} >/dev/null 2>&1
+function check_tag() {
+    local repo_name=$1
+    local tag=$2
+    local repo_path=$(get_local_repo_path ${repo_name})
+    if git -C ${repo_path} ls-remote --exit-code --tags origin ${tag} >/dev/null 2>&1; then
+        echo "Tag ${tag} exists. Verify that the new version is correct."
+        return 1
+    fi
+    return 0
+}
+
+function validate_new_version() {
+    local repo_name=$1
+    local new_version_string=$2
+
+    check_version_string ${new_version_string}
+
+    # extract the latest version string from the latest tag
+    local repo_path=$(get_local_repo_path ${repo_name})
+    local latest_version_tag=$(git -C ${repo_path} describe --tags $(git -C ${repo_path} rev-list --tags --max-count=1))
+    local latest_version_string=${latest_version_tag#*v}
+    check_version_string ${latest_version_string}
+
+    # Split the latest and new version strings into arrays containing major, minor and patch versions
+    IFS='.'
+    read -ra latest_version_array <<<"${latest_version_string}"
+    read -ra new_version_array <<<"${new_version_string}"
+    unset IFS
+
+    # Compare each segment
+    for ((i = 0; i < 3; i++)); do
+        local new_version_segment=${new_version_array[i]}
+        local latest_version_segment=${latest_version_array[i]}
+        if ((${new_version_segment} > ${latest_version_segment})); then
+            return 0
+        elif ((${new_version_segment} < ${latest_version_segment})); then
+            echo "Cannot upgrade to specified version: new version (${new_version_string}) < latest version (${latest_version_string})"
+            return 1
+        fi
+    done
+
+    # Versions are equal
+    echo "Cannot upgrade to specified version: new version = latest version (${latest_version_string})"
+    return 1
 }
 
 function create_release_branch() {
@@ -281,17 +320,17 @@ function merge_release_tag_into_base_branch() {
 function main() {
 
     ## remove
-    scripts_dir=.
-    repo_name=MeshKernelReleaseAutomation
+    local scripts_dir=.
+    local repo_name=MeshKernelReleaseAutomation
     ## remove
 
     parse_arguments "$@"
-    check_version ${version}
-    check_time "gh_refresh_interval" ${gh_refresh_interval}
-    check_time "wait" ${wait}
+    check_version_string ${version}
+    check_time_value "gh_refresh_interval" ${gh_refresh_interval}
+    check_time_value "wait" ${wait}
 
-    tag=v${version}
-    release_branch=release/${tag}
+    local tag=v${version}
+    local release_branch=release/${tag}
 
     log_in
 
@@ -301,10 +340,14 @@ function main() {
 
     check_start_point ${repo_name} ${start_point}
 
+    check_tag ${repo_name} ${tag}
+
+    validate_new_version ${repo_name} ${version}
+
     create_release_branch ${repo_name} ${release_branch} ${start_point}
 
     # update version of python bindings
-    python_version_file=${work_dir}/${repo_name}/python/version.py
+    local python_version_file=${work_dir}/${repo_name}/python/version.py
     python ${scripts_dir}/bump_mkpy_versions.py \
         --file ${python_version_file} \
         --to_version ${version} \
@@ -318,8 +361,8 @@ function main() {
     monitor_checks ${repo_name} ${release_branch}
 
     # update product version
-    nuspec_file=${work_dir}/${repo_name}/nuget/MeshKernelReleaseAutomation.nuspec
-    dir_build_props_file=${work_dir}/${repo_name}/Directory.Build.props
+    local nuspec_file=${work_dir}/${repo_name}/nuget/MeshKernelReleaseAutomation.nuspec
+    local dir_build_props_file=${work_dir}/${repo_name}/Directory.Build.props
     python ${scripts_dir}/bump_package_version.py \
         --nuspec_file ${nuspec_file} \
         --dir_build_props_file ${dir_build_props_file} \
@@ -331,7 +374,7 @@ function main() {
     monitor_checks ${repo_name} ${release_branch}
 
     # update versions of dependencies
-    dir_package_props_file=${work_dir}/${repo_name}/Directory.Packages.props
+    local dir_package_props_file=${work_dir}/${repo_name}/Directory.Packages.props
     python ${scripts_dir}/bump_dependencies_versions.py \
         --dir_packages_props_file ${dir_package_props_file} \
         --to_versioned_packages "Deltares.MeshKernel:${version}  Invalid:2666.09.13   DHYDRO.SharedConfigurations:6.6.6.666   NUnit:3.12.6"
