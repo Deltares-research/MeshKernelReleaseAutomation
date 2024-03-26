@@ -1,5 +1,5 @@
 # MeshKernelPy version
-__version__ = "2.0.14"
+__version__ = "2.0.15"
 
 # MeshKernel version
-__backend_version__ = "2.0.14"
+__backend_version__ = "2.0.15"
