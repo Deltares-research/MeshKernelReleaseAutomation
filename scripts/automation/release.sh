@@ -161,11 +161,11 @@ function check_start_point() {
     local repo_path=$(get_local_repo_path ${repo_name})
     # determine the nature of the starting point
     local start_point=$2
-    if git -C ${repo_path} show-ref --tags --verify --quiet -- refs/tags/${start_point} >/dev/null 2>&1; then
+    if (git -C ${repo_path} show-ref --tags --verify --quiet -- refs/tags/${start_point} >/dev/null 2>&1); then
         echo Starting point is ${start_point}, which is a tag.
-    elif git -C ${repo_path} show-ref --verify --quiet -- refs/heads/${start_point} >/dev/null 2>&1; then
+    elif (git -C ${repo_path} show-ref --verify --quiet -- refs/heads/${start_point} >/dev/null 2>&1); then
         echo Starting point is ${start_point}, which is a branch.
-    elif git -C ${repo_path} rev-parse --verify ${start_point}^{commit} >/dev/null 2>&1; then
+    elif (git -C ${repo_path} rev-parse --verify ${start_point}^{commit} >/dev/null 2>&1); then
         echo Starting point is ${start_point}, which is a commit.
     else
         echo ${start_point} is neither a commit ID, a tag, nor a branch.
@@ -178,7 +178,7 @@ function check_tag() {
     local repo_name=$1
     local tag=$2
     local repo_path=$(get_local_repo_path ${repo_name})
-    if git -C ${repo_path} ls-remote --exit-code --tags origin ${tag} >/dev/null 2>&1; then
+    if (git -C ${repo_path} ls-remote --exit-code --tags origin ${tag} >/dev/null 2>&1); then
         echo "Tag ${tag} exists. Verify that the new version is correct."
         return 1
     fi
@@ -239,42 +239,96 @@ function get_default_branch_name() {
     echo $(git -C ${repo_path} symbolic-ref refs/remotes/origin/HEAD | sed 's@^refs/remotes/origin/@@')
 }
 
+function on_branch() {
+    local repo_name=$1
+    local branch=$2
+    local repo_path=$(get_local_repo_path ${repo_name})
+    local current_branch=$(git -C ${repo_path} rev-parse --abbrev-ref HEAD)
+    if [ "${branch}" == "${current_branch}" ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 function commit_and_push_changes() {
     local repo_name=$1
     local release_branch=$2
     local message=$3
+
+    if ! (on_branch ${repo_name} ${release_branch}); then return 1; fi
     local repo_path=$(get_local_repo_path ${repo_name})
-    git -C ${repo_path} add --all # brute force, maybe too much
+    # stage changes (brute force, maybe too much)
+    git -C ${repo_path} add --all
+    # commit changes
     git -C ${repo_path} commit -m "$message"
+    # push changes to remote
     git -C ${repo_path} push -u origin ${release_branch}
+}
+
+function branch_has_new_commits() {
+    local repo_name=$1
+    local release_branch=$2
+
+    if ! (on_branch ${repo_name} ${release_branch}); then return 1; fi
+    local repo_path=$(get_local_repo_path ${repo_name})
+
+    # Get the hash of the branch's initial commit
+    local initial_commit_hash=$(git -C ${repo_path} rev-list --max-parents=0 HEAD)
+    # get the hash of the last commit
+    local last_commit_hash=$(git -C ${repo_path} rev-parse HEAD)
+
+    # Compare the commit hashes
+    if [ "${initial_commit_hash}" != "${last_commit_hash}" ]; then
+        return 0
+    fi
+    return 1
+}
+
+function pull_request_exists() {
+    local repo_name=$1
+    local release_branch=$2
+    local repo=$(get_gh_repo_path ${repo_name})
+    # searching the list of open PRs does not return non-zero value if the search fails
+    # gh pr list --state open --search ${release_branch} >/dev/null 2>&1; echo $? # prints 0
+    # viewing an non-existent PR on the other hand does fail
+    gh pr view ${release_branch} --repo ${repo} >/dev/null 2>&1
 }
 
 function create_pull_request() {
     local repo_name=$1
     local release_branch=$2
     local tag=$3
-    local repo=$(get_gh_repo_path ${repo_name})
-    # different repos have different default branch names, such as master or main
-    local base_branch=$(get_default_branch_name ${repo_name})
-
-    gh pr create \
-        --repo ${repo} \
-        --base ${base_branch} \
-        --head ${release_branch} \
-        --title "Release ${tag}" \
-        --body "Release ${tag}"
-    # for some reason --fill does  not work
+    # do it only if new commits have been pushed to the branch
+    # (avoids non-zero exist code from gh pr create)
+    if (branch_has_new_commits ${repo_name} ${release_branch}) &&
+        ! (pull_request_exists ${repo_name} ${release_branch}); then
+        local repo=$(get_gh_repo_path ${repo_name})
+        # different repos have different default branch names, such as master or main
+        local base_branch=$(get_default_branch_name ${repo_name})
+        # create pull request
+        gh pr create \
+            --repo ${repo} \
+            --base ${base_branch} \
+            --head ${release_branch} \
+            --title "Release ${tag}" \
+            --body "Release ${tag}"
+        # for some reason --fill does  not work
+    fi
 }
 
 function monitor_checks() {
     local repo_name=$1
     local release_branch=$2
     local repo=$(get_gh_repo_path ${repo_name})
-    sleep ${wait}
-    gh pr checks ${release_branch} \
-        --repo ${repo} \
-        --watch \
-        --interval ${gh_refresh_interval}
+    if (pull_request_exists ${repo_name} ${release_branch}); then
+        # monitor the checks, wait a little until they are registered
+        sleep ${wait}
+        gh pr checks ${release_branch} \
+            --repo ${repo} \
+            --watch \
+            --interval ${gh_refresh_interval}
+    fi
 }
 
 function create_release() {
@@ -283,41 +337,55 @@ function create_release() {
     local tag=$3
     local repo=$(get_gh_repo_path ${repo_name})
 
-    gh release create ${tag} \
-        --repo ${repo} \
-        --target ${release_branch} \
-        --title ${tag} \
-        --generate-notes \
-        --latest
+    if (pull_request_exists ${repo_name} ${release_branch}); then
+        gh release create ${tag} \
+            --repo ${repo} \
+            --target ${release_branch} \
+            --title ${tag} \
+            --generate-notes \
+            --latest
+    fi
+}
+
+function release_exists() {
+    local repo_name=$1
+    local tag=$2
+    local repo=$(get_gh_repo_path ${repo_name})
+    # searching the list of open PRs does not return non-zero value if the search fails
+    # gh pr list --state open --search ${release_branch} >/dev/null 2>&1; echo $? # prints 0
+    # viewing an non-existent PR on the other hand does fail
+    gh release view ${tag} --repo ${repo} >/dev/null 2>&1
 }
 
 function merge_release_tag_into_base_branch() {
     local repo_name=$1
     local tag=$2
 
-    local repo_path=$(get_local_repo_path ${repo_name})
-    local base_branch=$(get_default_branch_name ${repo_name})
+    if (release_exists ${repo_name} ${tag}); then
+        local repo_path=$(get_local_repo_path ${repo_name})
+        local base_branch=$(get_default_branch_name ${repo_name})
 
-    # checkout the base branch, fetch everything, we care about the base branch and the latest release tag
-    git -C ${repo_path} checkout ${base_branch}
-    git -C ${repo_path} fetch --all
-    git -C ${repo_path} pull
+        # checkout the base branch, fetch everything, we care about the base branch and the latest release tag
+        git -C ${repo_path} checkout ${base_branch}
+        git -C ${repo_path} fetch --all
+        git -C ${repo_path} pull
 
-    # merge the tag into the base branch then push to origin
-    # merge conflicts can happen here!
-    # for ex when someone on the base branch modified a line this auto release had modified...
-    # auto-merge will fail which requires a merge tool as a first step.
-    # Merge tools do no guarantee resolving all conflicts automatically. Manual work becomes necessary... Abort or...
-    # - If releasing from the head of master, do it or schedule it at an ungodly hour and hope your teammates aren't nocturnal.
-    #   Chances of failure will be close to none. This will be the case most of the time.
-    # - Try to never release from a (very old) commit
-    # - If releasing from an existing tag (usually done for patching old branches without rolling put new  features),
-    #   this is where it gets tricky... I really can't think of a way to do this without
-    git -C ${repo_path} merge --no-ff ${tag}
-    git -C ${repo_path} push -u origin ${base_branch}
+        # merge the tag into the base branch then push to origin
+        # merge conflicts can happen here!
+        # for ex when someone on the base branch modified a line this auto release had modified...
+        # auto-merge will fail which requires a merge tool as a first step.
+        # Merge tools do no guarantee resolving all conflicts automatically. Manual work becomes necessary... Abort or...
+        # - If releasing from the head of master, do it or schedule it at an ungodly hour and hope your teammates aren't nocturnal.
+        #   Chances of failure will be close to none. This will be the case most of the time.
+        # - Try to never release from a (very old) commit
+        # - If releasing from an existing tag (usually done for patching old branches without rolling put new  features),
+        #   this is where it gets tricky... I really can't think of a way to do this without
+        git -C ${repo_path} merge --no-ff ${tag}
+        git -C ${repo_path} push -u origin ${base_branch}
+    fi
 }
 
-function main() {
+function release() {
 
     ## remove
     local scripts_dir=.
@@ -352,13 +420,7 @@ function main() {
         --file ${python_version_file} \
         --to_version ${version} \
         --to_backend_version ${version}
-
     commit_and_push_changes ${repo_name} ${release_branch} "Auto-update versions of python bindings"
-
-    # release has now diverged from the base branch, create a PR
-    create_pull_request ${repo_name} ${release_branch} ${tag}
-
-    monitor_checks ${repo_name} ${release_branch}
 
     # update product version
     local nuspec_file=${work_dir}/${repo_name}/nuget/MeshKernelReleaseAutomation.nuspec
@@ -368,18 +430,16 @@ function main() {
         --dir_build_props_file ${dir_build_props_file} \
         --version_tag "MeshKernelReleaseAutomationVersion" \
         --to_version ${version}
-
     commit_and_push_changes ${repo_name} ${release_branch} "Auto-update version of product"
-
-    monitor_checks ${repo_name} ${release_branch}
 
     # update versions of dependencies
     local dir_package_props_file=${work_dir}/${repo_name}/Directory.Packages.props
     python ${scripts_dir}/bump_dependencies_versions.py \
         --dir_packages_props_file ${dir_package_props_file} \
         --to_versioned_packages "Deltares.MeshKernel:${version}  Invalid:2666.09.13   DHYDRO.SharedConfigurations:6.6.6.666   NUnit:3.12.6"
-
     commit_and_push_changes ${repo_name} ${release_branch} "Auto-update versions of dependencies"
+
+    create_pull_request ${repo_name} ${release_branch} ${tag}
 
     monitor_checks ${repo_name} ${release_branch}
 
@@ -394,6 +454,10 @@ function main() {
 
     # log out
     log_out
+}
+
+main() {
+    release "$@"
 }
 
 main "$@"
