@@ -385,34 +385,9 @@ function merge_release_tag_into_base_branch() {
     fi
 }
 
-function release() {
-
-    ## remove
-    local scripts_dir=.
-    local repo_name=MeshKernelReleaseAutomation
-    ## remove
-
-    parse_arguments "$@"
-    check_version_string ${version}
-    check_time_value "gh_refresh_interval" ${gh_refresh_interval}
-    check_time_value "wait" ${wait}
-
-    local tag=v${version}
-    local release_branch=release/${tag}
-
-    log_in
-
-    create_work_dir
-
-    clone ${repo_name}
-
-    check_start_point ${repo_name} ${start_point}
-
-    check_tag ${repo_name} ${tag}
-
-    validate_new_version ${repo_name} ${version}
-
-    create_release_branch ${repo_name} ${release_branch} ${start_point}
+function update() {
+    local repo_name=$1
+    local release_branch=$2
 
     # update version of python bindings
     local python_version_file=${work_dir}/${repo_name}/python/version.py
@@ -439,6 +414,27 @@ function release() {
         --to_versioned_packages "Deltares.MeshKernel:${version}  Invalid:2666.09.13   DHYDRO.SharedConfigurations:6.6.6.666   NUnit:3.12.6"
     commit_and_push_changes ${repo_name} ${release_branch} "Auto-update versions of dependencies"
 
+}
+
+function release() {
+
+    local repo_name=$1
+
+    local tag=v${version}
+    local release_branch=release/${tag}
+
+    clone ${repo_name}
+
+    check_start_point ${repo_name} ${start_point}
+
+    check_tag ${repo_name} ${tag}
+
+    validate_new_version ${repo_name} ${version}
+
+    create_release_branch ${repo_name} ${release_branch} ${start_point}
+
+    update ${repo_name} ${release_branch}
+
     create_pull_request ${repo_name} ${release_branch} ${tag}
 
     monitor_checks ${repo_name} ${release_branch}
@@ -448,16 +444,26 @@ function release() {
 
     # merge the newly created release tag into the base branch
     merge_release_tag_into_base_branch ${repo_name} ${tag}
-
-    #clean
-    remove_work_dir
-
-    # log out
-    log_out
 }
 
 main() {
-    release "$@"
+
+    scripts_dir=.
+
+    parse_arguments "$@"
+    check_version_string ${version}
+    check_time_value "gh_refresh_interval" ${gh_refresh_interval}
+    check_time_value "wait" ${wait}
+
+    log_in
+    create_work_dir
+
+    release "MeshKernelReleaseAutomation"
+
+    #clean
+    remove_work_dir
+    # log out
+    log_out
 }
 
 main "$@"
