@@ -172,6 +172,7 @@ function check_time_value() {
 }
 
 function check_start_point() {
+    show_progress
     local repo_name=$1
     local repo_path=$(get_local_repo_path ${repo_name})
     # determine the nature of the starting point
@@ -201,6 +202,7 @@ function check_tag() {
 }
 
 function validate_new_version() {
+    show_progress
     local repo_name=$1
     local new_version_string=$2
 
@@ -497,13 +499,35 @@ function rerun_all_workflows() {
     show_progress
     local repo_name=$1
     local release_branch=$2
+
     local repo=$(get_gh_repo_path ${repo_name})
 
-    workflows_list=$(gh workflow list --repo ${repo} --json name --jq '.[].name')
+    workflows_list=$(
+        gh workflow list \
+            --repo ${repo} \
+            --json name \
+            --jq '.[].name'
+    )
+
     readarray -t workflows <<<"$workflows_list"
+
     for workflow in "${workflows[@]}"; do
-        echo "Rerunning $workflow"
-        gh workflow run "$workflow" --repo ${repo} --ref ${release_branch}
+        echo "Rerunning ${workflow}"
+        gh workflow run "${workflow}" \
+            --repo ${repo} \
+            --ref ${release_branch}
+        echo "Waiting for ${workflow} to finish..."
+        while [[ ${workflow_status} != "completed" ]]; do
+            sleep ${wait}
+            workflow_status=$(
+                gh run list \
+                    --repo ${repo} \
+                    --workflow "${workflow}" \
+                    --json status \
+                    --jq '.[0].status'
+            )
+        done
+        echo "Workflow ${workflow} completed"
     done
 }
 
@@ -523,7 +547,7 @@ function release() {
     local update_repo=$2
     local do_rerun_all_workflows=$3
 
-    print_box ${repo_name}
+    print_box "${repo_name} Release v${version}"
 
     local tag=v${version}
     local release_branch=release/${tag}
@@ -558,6 +582,8 @@ function release() {
 
 main() {
 
+    start_time=$(date +%s)
+
     local scripts_dir=$(get_scripts_dir)
 
     parse_arguments "$@"
@@ -576,6 +602,10 @@ main() {
 
     remove_work_dir
     log_out
+
+    end_time=$(date +%s)
+    elapsed_time=$((end_time - start_time))
+    print_box "Release v${version} took: $(date -u -d "@$elapsed_time" +%H:%M:%S)"
 }
 
 main "$@"
