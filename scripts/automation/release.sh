@@ -13,6 +13,11 @@ function show_progress() {
     echo ">> Executing: ${FUNCNAME[1]}"
 }
 
+function get_scripts_dir() {
+    local script_path=$0
+    echo $(dirname $(realpath "$0"))
+}
+
 function catch() {
     local exit_code=$1
     if [ ${exit_code} != "0" ]; then
@@ -502,10 +507,6 @@ function rerun_all_workflows() {
     done
 }
 
-# function rerun_all_jobs() {
-
-# }
-
 print_box() {
     local string="$1"
     local length=${#string}
@@ -557,7 +558,7 @@ function release() {
 
 main() {
 
-    scripts_dir=.
+    local scripts_dir=$(get_scripts_dir)
 
     parse_arguments "$@"
     check_version_string ${version}
