@@ -9,30 +9,64 @@ gh_refresh_interval=30 # seconds
 wait=${gh_refresh_interval}
 clean=false
 
-function show_progress() {
-    echo ">> Executing: ${FUNCNAME[1]}"
+function col_echo() {
+    local color=$1
+    local text=$2
+    if ! [[ ${color} =~ '^[0-9]$' ]]; then
+        case $(echo ${color} | tr '[:upper:]' '[:lower:]') in
+        --black | -k)
+            color=0
+            ;;
+        --red | -r)
+            color=1
+            ;;
+        --green | -g)
+            color=2
+            ;;
+        --yellow | -y)
+            color=3
+            ;;
+        --blue | -b)
+            color=4
+            ;;
+        --magenta | -m)
+            color=5
+            ;;
+        --cyan | -c)
+            color=6
+            ;;
+        --white | -w)
+            color=7
+            ;;
+        *) # default color
+            color=9
+            ;;
+        esac
+    fi
+    tput setaf ${color}
+    echo ${text}
+    tput sgr0
 }
 
-function get_scripts_dir() {
-    local script_path=$0
-    echo $(dirname $(realpath "$0"))
+function show_progress() {
+    col_echo --blue ">> Executing: ${FUNCNAME[1]}"
 }
 
 function catch() {
     local exit_code=$1
     if [ ${exit_code} != "0" ]; then
-        echo "Error occurred"
-        echo "  Line     : ${BASH_LINENO[1]}"
-        echo "  Function : ${FUNCNAME[1]}"
-        echo "  Command  : ${BASH_COMMAND}"
-        echo "  Exit code: ${exit_code}"
+        col_echo --red "Error occurred"
+        col_echo --red "  Line     : ${BASH_LINENO[1]}"
+        col_echo --red "  Function : ${FUNCNAME[1]}"
+        col_echo --red "  Command  : ${BASH_COMMAND}"
+        col_echo --red "  Exit code: ${exit_code}"
     fi
 }
 
 trap 'catch $?' EXIT
 
 function usage {
-    echo "Usage: $0 --version string --base_branch string --gh_token string --gh_refresh_interval integer --wait integer"
+    echo "Usage: $0 --version [string] --start_point [string] --gh_token [string] --gh_refresh_interval [integer] --wait [integer] --clean"
     echo "Creates a new release"
     echo ""
     echo "  --work_dir             Required  string   Path to work directory"
@@ -132,6 +166,10 @@ function remove_work_dir() {
     if ${clean}; then
         rm -fr ${work_dir}
     fi
+}
+
+function get_scripts_path() {
+    echo $(dirname $(realpath "$0"))
 }
 
 function get_gh_repo_path() {
@@ -443,7 +481,7 @@ function update_py() {
 
     # update version of python bindings
     local python_version_file=${work_dir}/${repo_name}/DummyProductPY/version.py
-    python ${scripts_dir}/bump_mkpy_versions.py \
+    python $(get_scripts_path)/bump_mkpy_versions.py \
         --file ${python_version_file} \
         --to_version ${version} \
         --to_backend_version ${version}
@@ -478,7 +516,7 @@ function update_net() {
     # update product version
     local nuspec_file=${work_dir}/${repo_name}/nuget/DummyProductNET.nuspec
     local dir_build_props_file=${work_dir}/${repo_name}/Directory.Build.props
-    python ${scripts_dir}/bump_package_version.py \
+    python $(get_scripts_path)/bump_package_version.py \
         --nuspec_file ${nuspec_file} \
         --dir_build_props_file ${dir_build_props_file} \
         --version_tag "DummyProductNETVersion" \
@@ -488,7 +526,7 @@ function update_net() {
 
     # update versions of dependencies
     local dir_package_props_file=${work_dir}/${repo_name}/Directory.Packages.props
-    python ${scripts_dir}/bump_dependencies_versions.py \
+    python $(get_scripts_path)/bump_dependencies_versions.py \
         --dir_packages_props_file ${dir_package_props_file} \
         --to_versioned_packages "Deltares.DummyProductCPP:${version}"
     commit_and_push_changes ${repo_name} ${release_branch} \
@@ -531,14 +569,14 @@ function rerun_all_workflows() {
     done
 }
 
-print_box() {
+function print_box() {
     local string="$1"
     local length=${#string}
     local border="+-$(printf "%${length}s" | tr ' ' '-')-+"
 
-    echo "$border"
-    echo "| $string |"
-    echo "$border"
+    col_echo --green "$border"
+    col_echo --green "| $string |"
+    col_echo --green "$border"
 }
 
 function release() {
@@ -568,7 +606,6 @@ function release() {
 
     monitor_checks ${repo_name} ${release_branch}
 
-    # create tagged release from the release branch, set title same as tag, autogenerate the release notes and set it to latest
     create_release ${repo_name} ${release_branch} ${tag}
 
     if [[ ${do_rerun_all_workflows} -eq 1 ]]; then
@@ -576,22 +613,22 @@ function release() {
         monitor_checks ${repo_name} ${release_branch}
     fi
 
-    # merge the newly created release tag into the base branch
     merge_release_tag_into_base_branch ${repo_name} ${tag}
 }
 
-main() {
+function main() {
 
-    start_time=$(date +%s)
-
-    local scripts_dir=$(get_scripts_dir)
+    local start_time=$(date +%s)
 
     parse_arguments "$@"
     check_version_string ${version}
     check_time_value "gh_refresh_interval" ${gh_refresh_interval}
     check_time_value "wait" ${wait}
 
+    print_box "Release v${version}"
+
     log_in
+
     create_work_dir
 
     release "DummyProductCPP" update_cpp 1
@@ -601,11 +638,12 @@ main() {
     release "DummyProductNET" update_net 0
 
     remove_work_dir
+
     log_out
 
-    end_time=$(date +%s)
-    elapsed_time=$((end_time - start_time))
-    print_box "Release v${version} took: $(date -u -d "@$elapsed_time" +%H:%M:%S)"
+    local end_time=$(date +%s)
+    local elapsed_time=$((end_time - start_time))
+    print_box "Release v${version} took $(date -u -d "@$elapsed_time" +%H:%M:%S)"
 }
 
 main "$@"
