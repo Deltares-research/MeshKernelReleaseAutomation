@@ -5,8 +5,11 @@ set -e
 repo_host=github.com
 repo_owner=Deltares-research
 
-gh_refresh_interval=30 # seconds
-wait=${gh_refresh_interval}
+github_refresh_interval=30 # seconds
+delay=${github_refresh_interval}
+upload_to_pypi=false
+pypi_access_token=""
+teamcity_access_token=""
 clean=false
 
 function col_echo() {
@@ -66,26 +69,32 @@ function catch() {
 trap 'catch $?' EXIT
 
 function usage {
-    echo "Usage: $0 --version [string] --start_point [string] --gh_token [string] --gh_refresh_interval [integer] --wait [integer] --clean"
-    echo "Creates a new release"
-    echo ""
-    echo "  --work_dir             Required  string   Path to work directory"
-    echo "  --version              Required  string   Version of new release"
-    echo "  --start_point          Required  string   ID of commit, branch or tag to check out"
-    echo "                                            If provided, it should belong to the specified base branch. "
-    echo "                                            Otherwise the HEAD of  the base branch is checked out."
-    echo "  --gh_token             Required  string   Path to github token"
-    echo "  --gh_refresh_interval  Optional  integer  Refresh interval in seconds "
-    echo "                                            Used as a refresh interval while watching github PR checks, default = 30s"
-    echo "  --wait                 Optional  integer  Wait duration in seconds"
-    echo "                                            The script sleeps for this duration before watching github PR checks, default = 30s"
-    echo "  --clean                Optional           If supplied, the working directory is removed. Otherwise, it is kept."
+    echo "Usage: $0 [OPTIONS]"
+    echo "Creates a new release."
+    echo " Options:"
+    echo "  --work_dir                 Required   string   Path to the work directory"
+    echo "  --version                  Required   string   Semantic version of new release"
+    echo "  --start_point              Required   string   ID of commit, branch or tag to check out"
+    echo "                                                 If a branch is specified, the HEAD of the branch is checked out"
+    echo "  --github_access_token      Required   string   Path to github access token"
+    echo "  --github_refresh_interval  Optional   integer  Refresh interval in seconds."
+    echo "  --upload_to_pypi           Optional            If supplied, the python wheels are uploaded to PyPi"
+    echo "  --pypi_access_token        Dependent  string   Path to PyPi access token"
+    echo "                                                 Required if --upload_to_pypi is provided, ignored otherwise"
+    echo "  --teamcity_access_token    Dependent  string   Path to teamcity access token"
+    echo "                                                 Required if --upload_to_pypi is provided, ignored otherwise"
+    echo "                                                 Used as a refresh interval while watching github PR checks (default = 30s)"
+    echo "  --delay                    Optional   integer  Delay in seconds"
+    echo "                                                 The script sleeps for this duration before watching github PR checks (default = 30s)"
+    echo "  --clean                    Optional            If supplied, the work directory is removed upon completion"
+    echo "  --help                                         Display this help and exit"
     echo ""
 }
 
 # Define the parse_named_arguments function
 function parse_arguments() {
     show_progress
+    local do_exit=false
     positional_args=()
     while [[ $# -gt 0 ]]; do
         case $1 in
@@ -108,18 +117,32 @@ function parse_arguments() {
             shift # past argument
             shift # past value
             ;;
-        --gh_token)
-            declare -g gh_token="$2"
+        --github_access_token)
+            declare -g github_access_token="$2"
             shift # past argument
             shift # past value
             ;;
-        --gh_refresh_interval)
-            declare -gi gh_refresh_interval="$2"
+        --github_refresh_interval)
+            declare -gi github_refresh_interval="$2"
             shift # past argument
             shift # past value
             ;;
-        --wait)
-            declare -gi wait="$2"
+        --upload_to_pypi)
+            declare -g upload_to_pypi=true
+            shift # past argument
+            ;;
+        --pypi_access_token)
+            declare -g pypi_access_token="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --teamcity_access_token)
+            declare -g teamcity_access_token="$2"
+            shift # past argument
+            shift # past value
+            ;;
+        --delay)
+            declare -gi delay="$2"
             shift # past argument
             shift # past value
             ;;
@@ -128,9 +151,11 @@ function parse_arguments() {
             shift # past argument
             ;;
         -* | --*)
-            echo "Unknown option $1"
-            usage
-            exit 1
+            echo "Unknown parameter $1"
+            #usage
+            #exit 1
+            do_exit=true
+            shift # past argument
             ;;
         *)
             positional_args+=("$1") # save positional arg
@@ -139,8 +164,40 @@ function parse_arguments() {
         esac
     done
 
+    # required parameters
+    if [[ -z ${work_dir} ]]; then
+        echo "Missing parameter --work_dir"
+        do_exit=true
+    elif [[ -z ${version} ]]; then
+        echo "Missing parameter --version"
+        do_exit=true
+    elif [[ -z ${start_point} ]]; then
+        echo "Missing parameter --start_point"
+        do_exit=true
+    elif [[ -z ${github_access_token} ]]; then
+        echo "Missing parameter --github_access_token"
+        do_exit=true
+    fi
+
+    # dependent parameters
+    if ${upload_to_pypi}; then
+        if ! test -f "${pypi_access_token}"; then
+            echo "Missing parameter --pypi_access_token: required when --upload_to_pypi is provided."
+            do_exit=true
+        fi
+        if ! test -f "${teamcity_access_token}"; then
+            echo "Missing parameter --teamcity_access_token: required when --upload_to_pypi is provided."
+            do_exit=true
+        fi
+    fi
+
+    # positional arguments
     if ((${#positional_args[@]})); then
         echo "Found positional arguments (${positional_args[@]}). Such arguments are not allowed. Only named arguments are valid."
+        do_exit=true
+    fi
+
+    if ${do_exit}; then
         usage
         exit 1
     fi
@@ -148,7 +205,7 @@ function parse_arguments() {
 
 function log_in() {
     show_progress
-    gh auth login --with-token <${gh_token}
+    gh auth login --with-token <${github_access_token}
 }
 
 function log_out() {
@@ -398,12 +455,12 @@ function monitor_checks() {
     local repo=$(get_gh_repo_path ${repo_name})
     #if (pull_request_exists ${repo_name} ${release_branch}); then
     # monitor the checks, wait a little until they are registered
-    sleep ${wait}
+    sleep ${delay}
     set +e
     gh pr checks ${release_branch} \
         --repo ${repo} \
         --watch \
-        --interval ${gh_refresh_interval}
+        --interval ${github_refresh_interval}
     set -e
     #fi
 }
@@ -556,7 +613,7 @@ function rerun_all_workflows() {
             --ref ${release_branch}
         echo "Waiting for ${workflow} to finish..."
         while [[ ${workflow_status} != "completed" ]]; do
-            sleep ${wait}
+            sleep ${delay}
             workflow_status=$(
                 gh run list \
                     --repo ${repo} \
@@ -622,8 +679,8 @@ function main() {
 
     parse_arguments "$@"
     check_version_string ${version}
-    check_time_value "gh_refresh_interval" ${gh_refresh_interval}
-    check_time_value "wait" ${wait}
+    check_time_value "github_refresh_interval" ${github_refresh_interval}
+    check_time_value "delay" ${delay}
 
     print_box "Release v${version}"
 
@@ -632,9 +689,7 @@ function main() {
     create_work_dir
 
     release "DummyProductCPP" update_cpp 1
-
     release "DummyProductPY" update_py 0
-
     release "DummyProductNET" update_net 0
 
     remove_work_dir
