@@ -271,8 +271,13 @@ function check_start_point() {
     local repo_name=$1
     local repo_path=$(get_local_repo_path ${repo_name})
     # determine the nature of the starting point
-    local start_point=$2
-    if (git -C ${repo_path} show-ref --tags --verify --quiet -- refs/tags/${start_point} >/dev/null 2>&1); then
+    #local start_point=$2
+    start_point=$2
+    if [ "$start_point" == "main" ] ||
+        [ "$start_point" == "master" ] ||
+        [ "$start_point" == "latest" ]; then # auto-detects default branch name when there's a mess of mains and masters
+        start_point=$(get_default_branch_name ${repo_name})
+    elif (git -C ${repo_path} show-ref --tags --verify --quiet -- refs/tags/${start_point} >/dev/null 2>&1); then
         echo Starting point is ${start_point}, which is a tag.
     elif (git -C ${repo_path} show-ref --verify --quiet -- refs/heads/${start_point} >/dev/null 2>&1); then
         echo Starting point is ${start_point}, which is a branch.
@@ -340,11 +345,13 @@ function create_release_branch() {
     local repo_path=$(get_local_repo_path ${repo_name})
     # pull remote
     git -C ${repo_path} pull origin ${start_point}
+    git -C ${repo_path} status
     # switch to release branch
     git -C ${repo_path} checkout -B ${release_branch} ${start_point}
     git -C ${repo_path} status
     # and immediately push it to remote
     git -C ${repo_path} push -f origin ${release_branch}
+    git -C ${repo_path} status
 }
 
 function get_default_branch_name() {
@@ -404,18 +411,24 @@ function commit_and_push_changes() {
 # }
 
 function branch_has_new_commits() {
+    show_progress
     local repo_name=$1
-    local release_branch=$2
-    local start_point=$3
+    local start_point=$2
+    local release_branch=$3
     local repo_path=$(get_local_repo_path ${repo_name})
     # is this really te best way?
-    if [ -n "$(git -C ${repo_path} log --oneline ${release_branch}..${start_point})" ]; then
+    echo "Checking if ${release_branch} has new commits on top of ${start_point}..."
+    if [ -n "$(git -C ${repo_path} log --oneline ${start_point}..${release_branch})" ]; then
+        echo "Found new commits"
         return 0
+    else
+        echo "Could not find new commits"
+        return 1
     fi
-    return 1
 }
 
 function pull_request_exists() {
+    show_progress
     local repo_name=$1
     local release_branch=$2
     local repo=$(get_gh_repo_path ${repo_name})
@@ -432,20 +445,21 @@ function create_pull_request() {
     local tag=$3
     # do it only if new commits have been pushed to the branch
     # (avoids non-zero exist code from gh pr create)
-    #if (branch_has_new_commits ${repo_name} ${release_branch} ${start_point}) &&
-    #    ! (pull_request_exists ${repo_name} ${release_branch}); then
-    local repo=$(get_gh_repo_path ${repo_name})
-    # different repos have different default branch names, such as master or main
-    local base_branch=$(get_default_branch_name ${repo_name})
-    # create pull request
-    gh pr create \
-        --repo ${repo} \
-        --base ${base_branch} \
-        --head ${release_branch} \
-        --title "Release ${tag}" \
-        --body "Release ${tag}"
+    if (branch_has_new_commits ${repo_name} ${start_point} ${release_branch}); then
+        #if (branch_has_new_commits ${repo_name} ${start_point} ${release_branch}) &&
+        #    ! (pull_request_exists ${repo_name} ${release_branch}); then
+        local repo=$(get_gh_repo_path ${repo_name})
+        # different repos have different default branch names, such as master or main
+        local base_branch=$(get_default_branch_name ${repo_name})
+        # create pull request
+        gh pr create \
+            --repo ${repo} \
+            --base ${base_branch} \
+            --head ${release_branch} \
+            --title "Release ${tag}" \
+            --body "Release ${tag}"
     # for some reason --fill does  not work
-    #fi
+    fi
 }
 
 function monitor_checks() {
@@ -453,16 +467,16 @@ function monitor_checks() {
     local repo_name=$1
     local release_branch=$2
     local repo=$(get_gh_repo_path ${repo_name})
-    #if (pull_request_exists ${repo_name} ${release_branch}); then
-    # monitor the checks, wait a little until they are registered
-    sleep ${delay}
-    set +e
-    gh pr checks ${release_branch} \
-        --repo ${repo} \
-        --watch \
-        --interval ${github_refresh_interval}
-    set -e
-    #fi
+    if (pull_request_exists ${repo_name} ${release_branch}); then
+        # monitor the checks, wait a little until they are registered
+        sleep ${delay}
+        #set +e
+        gh pr checks ${release_branch} \
+            --repo ${repo} \
+            --watch \
+            --interval ${github_refresh_interval}
+        #set -e
+    fi
 }
 
 function create_release() {
@@ -501,8 +515,11 @@ function merge_release_tag_into_base_branch() {
 
         # checkout the base branch, fetch everything, we care about the base branch and the latest release tag
         git -C ${repo_path} checkout ${base_branch}
+        git -C ${repo_path} status
         git -C ${repo_path} fetch --all
+        git -C ${repo_path} status
         git -C ${repo_path} pull
+        git -C ${repo_path} status
 
         # merge the tag into the base branch then push to origin
         # merge conflicts can happen here!
@@ -515,7 +532,9 @@ function merge_release_tag_into_base_branch() {
         # - If releasing from an existing tag (usually done for patching old branches without rolling put new  features),
         #   this is where it gets tricky... I really can't think of a way to do this without
         git -C ${repo_path} merge --no-ff ${tag}
+        git -C ${repo_path} status
         git -C ${repo_path} push -u origin ${base_branch}
+        git -C ${repo_path} status
     fi
 }
 
@@ -526,8 +545,10 @@ function update_cpp() {
     local repo_path=$(get_local_repo_path ${repo_name})
     # empty commit
     git -C ${repo_path} commit --allow-empty -m "Trigger PR on $release_branch"
+    git -C ${repo_path} status
     # push changes to remote
     git -C ${repo_path} push -u origin ${release_branch}
+    git -C ${repo_path} status
     return 0
 }
 
@@ -537,7 +558,7 @@ function update_py() {
     local release_branch=$2
 
     # update version of python bindings
-    local python_version_file=${work_dir}/${repo_name}/DummyProductPY/version.py
+    local python_version_file=${work_dir}/${repo_name}/meshkernel/version.py
     python $(get_scripts_path)/bump_mkpy_versions.py \
         --file ${python_version_file} \
         --to_version ${version} \
@@ -551,41 +572,28 @@ function update_net() {
     local repo_name=$1
     local release_branch=$2
 
-    # download artifact from backend and upload it to repository
-    # this must be removed
-    local repo=$(get_gh_repo_path "DummyProductCPP")
-    local last_run_id=$(
-        gh run list \
-            --repo=${repo} \
-            --workflow="Build and deploy" \
-            --branch=${release_branch} \
-            --limit=1 \
-            --json databaseId \
-            --jq '.[].databaseId'
-    )
-    gh run download $last_run_id \
-        --repo=${repo} \
-        --name="packages-windows-2022-Release" \
-        --dir ${work_dir}/${repo_name}/dependencies
-    commit_and_push_changes ${repo_name} ${release_branch} \
-        "Release v${version} auto-update: upload Deltares.DummyProductCPP nupkg"
-
     # update product version
-    local nuspec_file=${work_dir}/${repo_name}/nuget/DummyProductNET.nuspec
+    local nuspec_file=${work_dir}/${repo_name}/nuget/MeshKernelNET.nuspec
     local dir_build_props_file=${work_dir}/${repo_name}/Directory.Build.props
     python $(get_scripts_path)/bump_package_version.py \
         --nuspec_file ${nuspec_file} \
         --dir_build_props_file ${dir_build_props_file} \
-        --version_tag "DummyProductNETVersion" \
+        --version_tag "MeshKernelNETVersion" \
         --to_version ${version}
     commit_and_push_changes ${repo_name} ${release_branch} \
         "Release v${version} auto-update: update version of product"
 
     # update versions of dependencies
+    local meshkernel_build_number=$(
+        python $(get_scripts_path)/get_build_number.py \
+            --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Build \
+            --version ${version} \
+            --teamcity_access_token ${teamcity_access_token}
+    )
     local dir_package_props_file=${work_dir}/${repo_name}/Directory.Packages.props
     python $(get_scripts_path)/bump_dependencies_versions.py \
         --dir_packages_props_file ${dir_package_props_file} \
-        --to_versioned_packages "Deltares.DummyProductCPP:${version}"
+        --to_versioned_packages "Deltares.MeshKernel:${version}.${meshkernel_build_number}"
     commit_and_push_changes ${repo_name} ${release_branch} \
         "Release v${version} auto-update: update versions of dependencies"
 }
@@ -665,12 +673,21 @@ function release() {
 
     create_release ${repo_name} ${release_branch} ${tag}
 
-    if [[ ${do_rerun_all_workflows} -eq 1 ]]; then
-        rerun_all_workflows ${repo_name} ${release_branch}
-        monitor_checks ${repo_name} ${release_branch}
-    fi
+    # if [[ ${do_rerun_all_workflows} -eq 1 ]]; then
+    #     rerun_all_workflows ${repo_name} ${release_branch}
+    #     monitor_checks ${repo_name} ${release_branch}
+    # fi
 
     merge_release_tag_into_base_branch ${repo_name} ${tag}
+}
+
+function download_artifacts() {
+    mkdir ${work_dir}/artifacts
+    mkdir ${work_dir}/artifacts/python_wheels
+    python $(get_scripts_path)/download_python_wheels_from_teamcity.py \
+        --version ${version} \
+        --teamcity_access_token ${teamcity_access_token} \
+        --destination ${work_dir}/artifacts/python_wheels
 }
 
 function main() {
@@ -688,9 +705,11 @@ function main() {
 
     create_work_dir
 
-    release "DummyProductCPP" update_cpp 1
-    release "DummyProductPY" update_py 0
-    release "DummyProductNET" update_net 0
+    release "MeshKernelTest" update_cpp 1
+    release "MeshKernelPyTest" update_py 0
+    release "MeshKernelNETTest" update_net 0
+
+    download_artifacts
 
     remove_work_dir
 
