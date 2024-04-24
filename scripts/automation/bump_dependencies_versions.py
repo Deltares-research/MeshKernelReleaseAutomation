@@ -122,15 +122,5 @@ if __name__ == "__main__":
             args.dir_packages_props_file, args.to_versioned_packages
         )
 
-        # print(is_valid_version_string("1.2.3"))  # True
-        # print(is_valid_version_string("1.2.3.4"))  # True
-        # print(is_valid_version_string("1.2.3.4.5"))  # False
-        # print(is_valid_version_string("1.2.3-alpha"))  # True
-        # print(is_valid_version_string("1.2.3.4-alpha"))  # True
-        # print(is_valid_version_string("1.2.3.1234-dev"))  # True
-        # print(is_valid_version_string("1.2.3.4-rc1"))  # True
-        # print(is_valid_version_string("1.2.3.4.dev"))  # False
-        # print(is_valid_version_string("1.2.3.4-123"))  # True
-
     except Exception as error:
         print("Error:", error, file=sys.stderr)

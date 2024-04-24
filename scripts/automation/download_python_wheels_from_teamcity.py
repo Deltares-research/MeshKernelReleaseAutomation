@@ -4,7 +4,7 @@ import re
 import sys
 from pathlib import Path
 
-import requests
+from request_wrapper import DOWNLOADS_ROOT, RequestWrapper
 
 
 def parse_args():
@@ -85,30 +85,25 @@ def download_python_wheels(
     build_tag = f"v{version}"
     branch = f"release/v{version}"
 
-    platform_dict = {
+    teamcity_builds = {
         "Windows": "win_amd64",
         "Linux": "manylinux_2_17_x86_64.manylinux2014_x86_64",
     }
 
-    HEADERS = {
-        "Authorization": f"Bearer {teamcity_access_token}",
-        "Content-Type": "application/json",
-    }
+    request = RequestWrapper(teamcity_access_token)
 
-    for platform, arch in platform_dict.items():
+    for platform, arch in teamcity_builds.items():
         artifact = f"meshkernel-{version}-py3-none-{arch}.whl"
         URL = (
             "https://dpcbuild.deltares.nl/repository/download/"
             f"GridEditor_MeshKernelPy_{platform}_BuildPythonWheel/"
             f"{build_tag}.tcbuildtag/{artifact}?branch={branch}"
         )
-        response = requests.get(url=URL, headers=HEADERS)
-        response.raise_for_status()
+        response = request.get(URL)
         path = os.path.join(destination, artifact)
         with open(path, "wb") as wheel:
             for chunk in response.iter_content(chunk_size=256):
                 wheel.write(chunk)
-        response.close()
 
 
 if __name__ == "__main__":
