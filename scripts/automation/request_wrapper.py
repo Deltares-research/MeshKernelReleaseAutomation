@@ -4,6 +4,7 @@ TEAMCITY_URL = "https://dpcbuild.deltares.nl"
 BUILDS_ROOT = f"{TEAMCITY_URL}/app/rest/builds"
 # for user/password auth, use
 # BUILDS_ROOT = f"{TEAMCITY_URL}/httpAuth/app/rest/builds":
+BUILDS_QUEUE_ROOT = f"{TEAMCITY_URL}/app/rest/buildQueue"
 DOWNLOADS_ROOT = f"{TEAMCITY_URL}/repository/download"
 
 
@@ -82,5 +83,14 @@ class RequestWrapper:
             int: The response.
         """
         response = requests.put(url=url, headers=self.headers)
+        response.raise_for_status()
+        return response
+
+    def post(self, url: str, json: dict) -> requests.Response:
+        response = requests.post(
+            url=url,
+            headers=self.headers,
+            json=json,
+        )
         response.raise_for_status()
         return response

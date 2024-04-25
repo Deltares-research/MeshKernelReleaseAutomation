@@ -63,7 +63,9 @@ if __name__ == "__main__":
     try:
         args = parse_args()
         build_counter = get_build_counter(
-            args.build_config_id, args.version, args.teamcity_access_token.read()
+            args.build_config_id,
+            args.version,
+            args.teamcity_access_token.read(),
         )
         if build_counter:
             print(build_counter)
