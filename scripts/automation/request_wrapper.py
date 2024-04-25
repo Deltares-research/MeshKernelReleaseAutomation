@@ -4,7 +4,7 @@ TEAMCITY_URL = "https://dpcbuild.deltares.nl"
 BUILDS_ROOT = f"{TEAMCITY_URL}/app/rest/builds"
 # for user/password auth, use
 # BUILDS_ROOT = f"{TEAMCITY_URL}/httpAuth/app/rest/builds":
-DOWNLOADS_ROOT = f"{TEAMCITY_URL}/repository/download/"
+DOWNLOADS_ROOT = f"{TEAMCITY_URL}/repository/download"
 
 
 class RequestWrapper:

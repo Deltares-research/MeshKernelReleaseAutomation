@@ -335,10 +335,8 @@ def run(
             The id of the build configuration on TeamCity that publishes the specified artifact.
         tag : str
             The tag to pin the build of the specified artifact with.
-        user : str
-            The user to authenticate with.
-        password : str
-            The password to authenticate with.
+        teamcity_access_token : str
+            The TeamCity access token to authenticate with.
     """
 
     request = RequestWrapper(teamcity_access_token)
