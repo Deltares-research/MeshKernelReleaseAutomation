@@ -1,7 +1,8 @@
-import re
 import argparse
 import sys
 from pathlib import Path
+
+from versioning import check_semantic_version
 
 
 def parse_args():
@@ -37,34 +38,9 @@ def parse_args():
     return args
 
 
-def is_semantic_version(version_string):
-    """
-    Check if a string corresponds to a semantic version.
-
-    Args:
-    - version_string (str): The string to be checked.
-
-    Returns:
-    - bool: True if the string corresponds to a semantic version, False otherwise.
-    """
-    # Semantic version regex pattern
-    pattern = r"^(\d+)\.(\d+)\.(\d+)$"
-
-    # Compile the regex pattern
-    regex = re.compile(pattern)
-
-    # Match the version string against the pattern
-    match = regex.match(version_string)
-
-    # If match is found and there are 3 groups corresponding to major, minor, and patch versions
-    return match and len(match.groups()) == 3
-
-
 def check_new_versions(version: str, backend_version: str):
-    if not is_semantic_version(version):
-        raise Exception(version + " is not a valid semantic version")
-    if not is_semantic_version(backend_version):
-        raise Exception(backend_version + " is not a valid semantic version")
+    check_semantic_version(version)
+    check_semantic_version(backend_version)
 
 
 def bump_mkpy_versions(version_file, new_version, new_backend_version):

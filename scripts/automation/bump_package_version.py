@@ -1,8 +1,9 @@
 import argparse
-import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+from versioning import check_semantic_version
 
 
 def parse_args() -> Path:
@@ -40,34 +41,6 @@ def parse_args() -> Path:
     )
 
     return parser.parse_args()
-
-
-def is_semantic_version(version_string):
-    """
-    Check if a string corresponds to a semantic version.
-
-    Args:
-    - version_string (str): The string to be checked.
-
-    Returns:
-    - bool: True if the string corresponds to a semantic version, False otherwise.
-    """
-    # Semantic version regex pattern
-    pattern = r"^(\d+)\.(\d+)\.(\d+)$"
-
-    # Compile the regex pattern
-    regex = re.compile(pattern)
-
-    # Match the version string against the pattern
-    match = regex.match(version_string)
-
-    # If match is found and there are 3 groups corresponding to major, minor, and patch versions
-    return (match is not None) and (len(match.groups()) == 3)
-
-
-def check_new_version(version: str):
-    if not is_semantic_version(version):
-        raise Exception(version + " is not a valid semantic version")
 
 
 def bump_nuspec_version(nuspec_file: Path, to_version: str):
@@ -127,7 +100,7 @@ def bump_dir_build_props_version(
 if __name__ == "__main__":
     try:
         args = parse_args()
-        check_new_version(args.to_version)
+        check_semantic_version(args.to_version)
         bump_nuspec_version(args.nuspec_file, args.to_version)
         bump_dir_build_props_version(
             args.dir_build_props_file, args.version_tag, args.to_version
