@@ -5,7 +5,6 @@ build and removes the pin when possible.
 
 import argparse
 import logging
-import sys
 from typing import Dict, Optional, Sequence
 
 from request_wrapper import BUILDS_ROOT, RequestWrapper

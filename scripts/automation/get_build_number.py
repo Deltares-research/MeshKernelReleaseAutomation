@@ -42,10 +42,9 @@ def get_build_counter(
     version: str,
     teamcity_access_token: str,
 ):
-    teamcity_url = "https://dpcbuild.deltares.nl"
     tag = f"v{version}"
     branch_name = f"release/{tag}"
-    url = f"{teamcity_url}/app/rest/builds?locator=buildType:{build_config_id},branch:{branch_name},tag:{tag}"
+    url = f"{BUILDS_ROOT}/app/rest/builds?locator=buildType:{build_config_id},branch:{branch_name},tag:{tag}"
     requests = RequestWrapper(teamcity_access_token)
     response = requests.get(url)
     builds = response.json()["build"]

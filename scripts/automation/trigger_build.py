@@ -1,9 +1,7 @@
 import argparse
 import sys
 import time
-import json
 
-import requests
 from request_wrapper import BUILDS_QUEUE_ROOT, BUILDS_ROOT, RequestWrapper
 
 
