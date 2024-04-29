@@ -883,6 +883,16 @@ function rebuild_cpp {
         --teamcity_access_token ${teamcity_access_token}
 }
 
+function create_conda_env() {
+    conda env create -f $(get_scripts_path)/release_conda_env.yml
+    activate release_conda_env
+}
+
+function remove_conda_env() {
+    conda deactivate
+    conda remove -y -n release_conda_env --all
+}
+
 function main() {
 
     local start_time=$(date +%s)
@@ -901,6 +911,8 @@ function main() {
     local tag=v${version}
     local release_branch=release/${tag}
 
+    create_conda_env
+
     release "MeshKernelTest" update_cpp
     rebuild_cpp ${release_branch} ${teamcity_access_token}
     pin_and_tag_artifacts_cpp ${release_branch} ${version} ${tag} ${teamcity_access_token}
@@ -914,6 +926,8 @@ function main() {
     #pin_and_tag_artifacts ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
     download_artifacts ${release_branch} ${version} ${tag} ${teamcity_access_token}
+
+    remove_conda_env
 
     remove_work_dir
 
