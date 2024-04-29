@@ -36,7 +36,6 @@ def parse_args():
     return args
 
 
-# Function to get the build counter given build configuration ID, branch name, and tag
 def get_build_counter(
     build_config_id: str,
     version: str,
@@ -44,7 +43,7 @@ def get_build_counter(
 ):
     tag = f"v{version}"
     branch_name = f"release/{tag}"
-    url = f"{BUILDS_ROOT}/app/rest/builds?locator=buildType:{build_config_id},branch:{branch_name},tag:{tag}"
+    url = f"{BUILDS_ROOT}?locator=buildType:{build_config_id},branch:{branch_name},tag:{tag}"
     requests = RequestWrapper(teamcity_access_token)
     response = requests.get(url)
     builds = response.json()["build"]
@@ -56,6 +55,26 @@ def get_build_counter(
         raise Exception(
             f"No builds found matching the criteria [buildType: {build_config_id}, branch: {branch_name}, tag: {tag}]."
         )
+
+
+# def get_build_counter(
+#     build_config_id: str,
+#     version: str,
+#     teamcity_access_token: str,
+# ):
+#     branch_name = f"release/v{version}"
+#     url = f"{BUILDS_ROOT}?locator=buildType:{build_config_id},branch:{branch_name}"
+#     requests = RequestWrapper(teamcity_access_token)
+#     response = requests.get(url)
+#     builds = response.json()["build"]
+#     if builds:
+#         build_counter = builds[0]["number"]
+#         # build number in TC is formatted as: build_counter + short_git_hash
+#         return build_counter.split("+")[0].strip()
+#     else:
+#         raise Exception(
+#             f"No builds found matching the criteria [buildType: {build_config_id}, branch: {branch_name}]."
+#         )
 
 
 if __name__ == "__main__":

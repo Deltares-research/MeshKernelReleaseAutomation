@@ -25,13 +25,6 @@ def parse_arguments():
         help="The id of the build configuration to trigger.",
     )
 
-    # parser.add_argument(
-    #     "--tag",
-    #     type=str,
-    #     required=True,
-    #     help="The tag to pin the build of the specified artifact with.",
-    # )
-
     parser.add_argument(
         "--refresh_interval",
         "-f",

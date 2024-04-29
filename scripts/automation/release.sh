@@ -51,10 +51,6 @@ function col_echo() {
     tput sgr0
 }
 
-function show_progress() {
-    col_echo --blue ">> Executing: ${FUNCNAME[1]}"
-}
-
 function catch() {
     local exit_code=$1
     if [ ${exit_code} != "0" ]; then
@@ -67,6 +63,10 @@ function catch() {
 }
 
 trap 'catch $?' EXIT
+
+function show_progress() {
+    col_echo --blue ">> Executing: ${FUNCNAME[1]}"
+}
 
 function usage {
     echo "Usage: $0 [OPTIONS]"
@@ -334,7 +334,7 @@ function validate_new_version() {
 
     # Versions are equal
     echo "Cannot upgrade to specified version: new version = latest version (${latest_version_string})"
-    return 1
+    return 0
 }
 
 function create_release_branch() {
@@ -479,6 +479,37 @@ function monitor_checks() {
     fi
 }
 
+# function release_exists_and_is_latest() {
+#     local repo_name=$1
+#     local tag=$2
+#     local repo=$(get_gh_repo_path ${repo_name})
+#     if (gh release list \
+#         --repo ${repo} \
+#         --json tagName,isLatest \
+#         --jq ".[] \
+#         | select(.tagName == \"${tag}\" and .isLatest == true)" >/dev/null 2>&1); then
+#         return 0
+#     else
+#         return 1
+#     fi
+# }
+
+function release_exists_and_is_latest() {
+    local repo_name=$1
+    local tag=$2
+    local repo=$(get_gh_repo_path ${repo_name})
+    local result=$(gh release list \
+        --repo ${repo} \
+        --json tagName,isLatest \
+        --jq ".[] \
+        | select(.tagName == \"${tag}\" and .isLatest == true)")
+    if [[ -n "${result}" ]]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 function create_release() {
     show_progress
     local repo_name=$1
@@ -486,22 +517,16 @@ function create_release() {
     local tag=$3
     local repo=$(get_gh_repo_path ${repo_name})
 
-    gh release create ${tag} \
+    if (gh release create ${tag} \
         --repo ${repo} \
         --target ${release_branch} \
         --title ${tag} \
         --generate-notes \
-        --latest
-}
-
-function release_exists() {
-    local repo_name=$1
-    local tag=$2
-    local repo=$(get_gh_repo_path ${repo_name})
-    # searching the list of open PRs does not return non-zero value if the search fails
-    # gh pr list --state open --search ${release_branch} >/dev/null 2>&1; echo $? # prints 0
-    # viewing an non-existent PR on the other hand does fail
-    gh release view ${tag} --repo ${repo} >/dev/null 2>&1
+        --latest); then
+        return 0
+    else
+        return 1
+    fi
 }
 
 function merge_release_tag_into_base_branch() {
@@ -509,7 +534,7 @@ function merge_release_tag_into_base_branch() {
     local repo_name=$1
     local tag=$2
 
-    if (release_exists ${repo_name} ${tag}); then
+    if (release_exists_and_is_latest ${repo_name} ${tag}); then
         local repo_path=$(get_local_repo_path ${repo_name})
         local base_branch=$(get_default_branch_name ${repo_name})
 
@@ -526,11 +551,11 @@ function merge_release_tag_into_base_branch() {
         # for ex when someone on the base branch modified a line this auto release had modified...
         # auto-merge will fail which requires a merge tool as a first step.
         # Merge tools do no guarantee resolving all conflicts automatically. Manual work becomes necessary... Abort or...
-        # - If releasing from the head of master, do it or schedule it at an ungodly hour and hope your teammates aren't nocturnal.
+        # - If releasing from the head of master, do it or schedule it at late time and hope your teammates aren't nocturnal.
         #   Chances of failure will be close to none. This will be the case most of the time.
         # - Try to never release from a (very old) commit
-        # - If releasing from an existing tag (usually done for patching old branches without rolling put new  features),
-        #   this is where it gets tricky... I really can't think of a way to do this without
+        # - If releasing from an existing tag (usually done for patching old branches without rolling out new features),
+        #   this is where it gets tricky... I really can't think of a way to do this
         git -C ${repo_path} merge --no-ff ${tag}
         git -C ${repo_path} status
         git -C ${repo_path} push -u origin ${base_branch}
@@ -645,6 +670,7 @@ function print_box() {
 }
 
 function release() {
+    show_progress
 
     local repo_name=$1
     local update_repo=$2
@@ -652,95 +678,34 @@ function release() {
     print_box "${repo_name} Release v${version}"
 
     local tag=v${version}
-    local release_branch=release/${tag}
 
-    clone ${repo_name}
+    if ! (release_exists_and_is_latest ${repo_name} ${tag}); then
 
-    check_start_point ${repo_name} ${start_point}
+        local release_branch=release/${tag}
 
-    check_tag ${repo_name} ${tag}
+        clone ${repo_name}
 
-    validate_new_version ${repo_name} ${version}
+        check_start_point ${repo_name} ${start_point}
 
-    create_release_branch ${repo_name} ${release_branch} ${start_point}
+        check_tag ${repo_name} ${tag}
 
-    ${update_repo} ${repo_name} ${release_branch}
+        validate_new_version ${repo_name} ${version}
 
-    create_pull_request ${repo_name} ${release_branch} ${tag}
+        create_release_branch ${repo_name} ${release_branch} ${start_point}
 
-    monitor_checks ${repo_name} ${release_branch}
+        ${update_repo} ${repo_name} ${release_branch}
 
-    create_release ${repo_name} ${release_branch} ${tag}
+        create_pull_request ${repo_name} ${release_branch} ${tag}
 
-    merge_release_tag_into_base_branch ${repo_name} ${tag}
+        monitor_checks ${repo_name} ${release_branch}
+
+        create_release ${repo_name} ${release_branch} ${tag}
+
+        merge_release_tag_into_base_branch ${repo_name} ${tag}
+    else
+        echo "Release tagged as ${tag} exists and is set as latest. Skipping."
+    fi
 }
-
-# function pin_and_tag_artifacts() {
-#     show_progress
-
-#     local release_branch=$1
-#     local version=$2
-#     local tag=$3
-#     local teamcity_access_token=$4
-
-#     python $(get_scripts_path)/pin_artifact.py \
-#         --branch_name ${release_branch} \
-#         --artifact_name meshkernel-${version}-py3-none-winn_arm64.whl \
-#         --build_config_id GridEditor_MeshKernelPyTest_Windows_BuildPythonWheel \
-#         --tag ${tag} \
-#         --teamcity_access_token ${teamcity_access_token}
-
-#     python $(get_scripts_path)/pin_artifact.py \
-#         --branch_name ${release_branch} \
-#         --artifact_name meshkernel-${version}-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl \
-#         --build_config_id GridEditor_MeshKernelPyTest_Linux_BuildPythonWheel \
-#         --tag ${tag} \
-#         --teamcity_access_token ${teamcity_access_token}
-
-#     # pin the last MeshKernel build
-#     python $(get_scripts_path)/pin_artifact.py \
-#         --branch_name ${release_branch} \
-#         --artifact_name NuGetContent.zip \
-#         --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Build \
-#         --tag ${tag} \
-#         --teamcity_access_token ${teamcity_access_token}
-#     # get the pinned build number
-#     local meshkernel_build_number=$(
-#         python $(get_scripts_path)/get_build_number.py \
-#             --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Build \
-#             --version ${version} \
-#             --teamcity_access_token ${teamcity_access_token}
-#     )
-#     # pin the MeshKernel nupkg
-#     python $(get_scripts_path)/pin_artifact.py \
-#         --branch_name ${release_branch} \
-#         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
-#         --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Package_MeshKernelSigned \
-#         --tag ${tag} \
-#         --teamcity_access_token ${teamcity_access_token}
-
-#     # pin the last MeshKernelNET build
-#     python $(get_scripts_path)/pin_artifact.py \
-#         --branch_name ${release_branch} \
-#         --artifact_name output.zip \
-#         --build_config_id GridEditor_MeshKernelNetTest_Build \
-#         --tag ${tag} \
-#         --teamcity_access_token ${teamcity_access_token}
-#     # get the pinned build number
-#     local meshkernelnet_build_number=$(
-#         python $(get_scripts_path)/get_build_number.py \
-#             --build_config_id GridEditor_MeshKernelNetTest_Build \
-#             --version ${version} \
-#             --teamcity_access_token ${teamcity_access_token}
-#     )
-#     # pin the MeshKernelNET nupkg
-#     python $(get_scripts_path)/pin_artifact.py \
-#         --branch_name ${release_branch} \
-#         --artifact_name MeshKernelNET.${version}.${meshkernelnet_build_number}.nupkg \
-#         --build_config_id GridEditor_MeshKernelNetTest_NuGet_MeshKernelNETSigned \
-#         --tag ${tag} \
-#         --teamcity_access_token ${teamcity_access_token}
-# }
 
 function pin_and_tag_artifacts_cpp() {
     show_progress
@@ -836,11 +801,31 @@ function download_artifacts() {
 
     mkdir ${work_dir}/artifacts
 
-    mkdir ${work_dir}/artifacts/python_wheels
+    local py_wheels_dir=${work_dir}/artifacts/python_wheels
+    mkdir ${py_wheels_dir}
     python $(get_scripts_path)/download_python_wheels.py \
         --version ${version} \
-        --destination ${work_dir}/artifacts/python_wheels \
+        --destination ${py_wheels_dir} \
         --teamcity_access_token ${teamcity_access_token}
+
+    local repo=$(get_gh_repo_path "MeshKernelPyTest")
+    local last_run_id=$(
+        gh run list \
+            --repo ${repo} \
+            --workflow="Build and test (main/release)" \
+            --branch=${release_branch} \
+            --limit=1 \
+            --json databaseId \
+            --jq '.[].databaseId'
+    )
+    gh run download $last_run_id \
+        --repo ${repo} \
+        --pattern meshkernel-macos-*-Release \
+        --dir ${py_wheels_dir}
+    # move the wheels from the ${py_wheels_dir}/meshkernel-macos-* to ${py_wheels_dir}
+    find ${py_wheels_dir} -type d -name 'meshkernel-macos-*-Release' -exec sh -c 'mv "$1"/*.whl "$0"' "$py_wheels_dir" {} \;
+    # then remove the unnecessary folders
+    rm -fr ${py_wheels_dir}/meshkernel-macos-*
 
     mkdir ${work_dir}/artifacts/nupkg
 
@@ -873,7 +858,33 @@ function download_artifacts() {
         --teamcity_access_token ${teamcity_access_token}
 }
 
-function rebuild_cpp {
+function upload_py_assets_to_github() {
+    local tag=$1
+    local meshkernelpy_repo=$(get_gh_repo_path "MeshKernelPyTest")
+    gh release upload ${tag} ${work_dir}/artifacts/python_wheels/*.whl --repo ${meshkernelpy_repo} --clobber
+}
+
+function upload_nupkg_assets_to_github() {
+    local tag=$1
+    local meshkernel_repo=$(get_gh_repo_path "MeshKernelTest")
+    gh release upload ${tag} ${work_dir}/artifacts/nupkg/Deltares.MeshKernel.*.nupkg --repo ${meshkernel_repo} --clobber
+    local meshkernelnet_repo=$(get_gh_repo_path "MeshKernelNETTest")
+    gh release upload ${tag} ${work_dir}/artifacts/nupkg/MeshKernelNET.*.nupkg --repo ${meshkernelnet_repo} --clobber
+}
+
+function upload_py_assets_to_pypi() {
+    local access_token=$1
+    local repo=$(get_gh_repo_path "MeshKernelPyTest")
+    python -m twine upload \
+        --verbose \
+        --repository meshkernel \
+        --username __token__ \
+        --password <${access_token}
+    ${work_dir}/artifacts/python_wheels/*.whl
+}
+
+function retrigger_cpp {
+    show_progress
     local release_branch=$1
     local teamcity_access_token=$2
     python $(get_scripts_path)/trigger_build.py \
@@ -884,13 +895,21 @@ function rebuild_cpp {
 }
 
 function create_conda_env() {
-    conda env create -f $(get_scripts_path)/release_conda_env.yml
-    activate release_conda_env
+    show_progress
+    local env_name="release_conda_env"
+    if ! conda env list | grep -q "\<$env_name\>"; then
+        conda env create -f $(get_scripts_path)/${env_name}.yml
+    fi
+    source activate ${env_name}
 }
 
 function remove_conda_env() {
-    conda deactivate
-    conda remove -y -n release_conda_env --all
+    show_progress
+    local env_name="release_conda_env"
+    if conda env list | grep -q "\<$env_name\>"; then
+        conda deactivate
+        conda remove -y -n ${env_name} --all
+    fi
 }
 
 function main() {
@@ -913,19 +932,23 @@ function main() {
 
     create_conda_env
 
-    release "MeshKernelTest" update_cpp
-    rebuild_cpp ${release_branch} ${teamcity_access_token}
-    pin_and_tag_artifacts_cpp ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    # release "MeshKernelTest" update_cpp
+    # retrigger_cpp ${release_branch} ${teamcity_access_token}
+    # pin_and_tag_artifacts_cpp ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    release "MeshKernelPyTest" update_py
-    pin_and_tag_artifacts_py ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    # release "MeshKernelPyTest" update_py
+    # pin_and_tag_artifacts_py ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    release "MeshKernelNETTest" update_net
-    pin_and_tag_artifacts_net ${release_branch} ${version} ${tag} ${teamcity_access_token}
-
-    #pin_and_tag_artifacts ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    # release "MeshKernelNETTest" update_net
+    # pin_and_tag_artifacts_net ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
     download_artifacts ${release_branch} ${version} ${tag} ${teamcity_access_token}
+
+    upload_py_assets_to_github ${tag}
+    upload_nupkg_assets_to_github ${tag}
+    # if ${upload_to_pypi}; then
+    #     upload_py_assets_to_pypi ${pypi_access_token}
+    # fi
 
     remove_conda_env
 
