@@ -932,15 +932,15 @@ function main() {
 
     create_conda_env
 
-    # release "MeshKernelTest" update_cpp
-    # retrigger_cpp ${release_branch} ${teamcity_access_token}
-    # pin_and_tag_artifacts_cpp ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    release "MeshKernelTest" update_cpp
+    retrigger_cpp ${release_branch} ${teamcity_access_token}
+    pin_and_tag_artifacts_cpp ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    # release "MeshKernelPyTest" update_py
-    # pin_and_tag_artifacts_py ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    release "MeshKernelPyTest" update_py
+    pin_and_tag_artifacts_py ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    # release "MeshKernelNETTest" update_net
-    # pin_and_tag_artifacts_net ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    release "MeshKernelNETTest" update_net
+    pin_and_tag_artifacts_net ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
     download_artifacts ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
