@@ -873,14 +873,15 @@ function upload_nupkg_assets_to_github() {
 }
 
 function upload_py_assets_to_pypi() {
-    local access_token=$1
+    local access_token_file=$1
+    local access_token=$(<${access_token_file})
     local repo=$(get_gh_repo_path "MeshKernelPyTest")
     python -m twine upload \
         --verbose \
-        --repository meshkernel \
+        --repository-url https://pypi.org/project/meshkernel/ \
         --username __token__ \
-        --password <${access_token}
-    ${work_dir}/artifacts/python_wheels/*.whl
+        --password ${access_token} \
+        ${work_dir}/artifacts/python_wheels/*.whl
 }
 
 function retrigger_cpp {
@@ -946,9 +947,9 @@ function main() {
 
     upload_py_assets_to_github ${tag}
     upload_nupkg_assets_to_github ${tag}
-    # if ${upload_to_pypi}; then
-    #     upload_py_assets_to_pypi ${pypi_access_token}
-    # fi
+    if ${upload_to_pypi}; then
+        upload_py_assets_to_pypi ${pypi_access_token}
+    fi
 
     remove_conda_env
 
