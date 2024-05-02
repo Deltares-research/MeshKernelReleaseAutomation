@@ -792,17 +792,17 @@ function pin_and_tag_artifacts_net() {
         --teamcity_access_token ${teamcity_access_token}
 }
 
-function download_artifacts() {
+function download_wheels() {
     show_progress
     local release_branch=$1
     local version=$2
     local tag=$3
     local teamcity_access_token=$4
 
-    mkdir ${work_dir}/artifacts
-
+    mkdir -p ${work_dir}/artifacts
     local py_wheels_dir=${work_dir}/artifacts/python_wheels
     mkdir ${py_wheels_dir}
+
     python $(get_scripts_path)/download_python_wheels.py \
         --version ${version} \
         --destination ${py_wheels_dir} \
@@ -812,7 +812,7 @@ function download_artifacts() {
     local last_run_id=$(
         gh run list \
             --repo ${repo} \
-            --workflow="Build and test (main/release)" \
+            --workflow "Build and test (release)" \
             --branch=${release_branch} \
             --limit=1 \
             --json databaseId \
@@ -826,8 +826,18 @@ function download_artifacts() {
     find ${py_wheels_dir} -type d -name 'meshkernel-macos-*-Release' -exec sh -c 'mv "$1"/*.whl "$0"' "$py_wheels_dir" {} \;
     # then remove the unnecessary folders
     rm -fr ${py_wheels_dir}/meshkernel-macos-*
+}
 
-    mkdir ${work_dir}/artifacts/nupkg
+function download_nupkgs() {
+    show_progress
+    local release_branch=$1
+    local version=$2
+    local tag=$3
+    local teamcity_access_token=$4
+
+    mkdir -p ${work_dir}/artifacts
+    local nupkg_dir=${work_dir}/artifacts/nupkg
+    mkdir ${nupkg_dir}
 
     local meshkernel_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
@@ -840,7 +850,7 @@ function download_artifacts() {
         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
         --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Package_MeshKernelSigned \
         --tag ${tag} \
-        --destination ${work_dir}/artifacts/nupkg \
+        --destination ${nupkg_dir} \
         --teamcity_access_token ${teamcity_access_token}
 
     local meshkernelnet_build_number=$(
@@ -854,17 +864,19 @@ function download_artifacts() {
         --artifact_name MeshKernelNET.${version}.${meshkernelnet_build_number}.nupkg \
         --build_config_id GridEditor_MeshKernelNetTest_NuGet_MeshKernelNETSigned \
         --tag ${tag} \
-        --destination ${work_dir}/artifacts/nupkg \
+        --destination ${nupkg_dir} \
         --teamcity_access_token ${teamcity_access_token}
 }
 
-function upload_py_assets_to_github() {
+function upload_wheel_assets_to_github() {
+    show_progress
     local tag=$1
     local meshkernelpy_repo=$(get_gh_repo_path "MeshKernelPyTest")
     gh release upload ${tag} ${work_dir}/artifacts/python_wheels/*.whl --repo ${meshkernelpy_repo} --clobber
 }
 
 function upload_nupkg_assets_to_github() {
+    show_progress
     local tag=$1
     local meshkernel_repo=$(get_gh_repo_path "MeshKernelTest")
     gh release upload ${tag} ${work_dir}/artifacts/nupkg/Deltares.MeshKernel.*.nupkg --repo ${meshkernel_repo} --clobber
@@ -872,7 +884,8 @@ function upload_nupkg_assets_to_github() {
     gh release upload ${tag} ${work_dir}/artifacts/nupkg/MeshKernelNET.*.nupkg --repo ${meshkernelnet_repo} --clobber
 }
 
-function upload_py_assets_to_pypi() {
+function upload_wheels_to_pypi() {
+    show_progress
     local access_token_file=$1
     local access_token=$(<${access_token_file})
     local repo=$(get_gh_repo_path "MeshKernelPyTest")
@@ -943,12 +956,13 @@ function main() {
     release "MeshKernelNETTest" update_net
     pin_and_tag_artifacts_net ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    download_artifacts ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    download_wheels ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    download_nupkgs ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    upload_py_assets_to_github ${tag}
+    upload_wheel_assets_to_github ${tag}
     upload_nupkg_assets_to_github ${tag}
     if ${upload_to_pypi}; then
-        upload_py_assets_to_pypi ${pypi_access_token}
+        upload_wheels_to_pypi ${pypi_access_token}
     fi
 
     remove_conda_env
