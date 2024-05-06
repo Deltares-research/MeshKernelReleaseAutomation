@@ -251,9 +251,8 @@ function check_version_string() {
     local pattern="^[0-9]+\.[0-9]+\.[0-9]+$"
     if ! [[ $version =~ $pattern ]]; then
         echo "The string \"$version\" does not correspond to a semantic version of the form <major>.<minor>.<patch>."
-        return 1
+        exit 1
     fi
-    return 0
 }
 
 function check_time_value() {
@@ -261,9 +260,8 @@ function check_time_value() {
     local value=$2
     if [[ $2 -le 0 ]]; then
         echo "$1 must be a positive integer."
-        return 1
+        exit 1
     fi
-    return 0
 }
 
 function check_start_point() {
@@ -285,9 +283,8 @@ function check_start_point() {
         echo Starting point is ${start_point}, which is a commit.
     else
         echo ${start_point} is neither a commit ID, a tag, nor a branch.
-        return 1
+        exit 1
     fi
-    return 0
 }
 
 function check_tag() {
@@ -296,9 +293,8 @@ function check_tag() {
     local repo_path=$(get_local_repo_path ${repo_name})
     if (git -C ${repo_path} ls-remote --exit-code --tags origin ${tag} >/dev/null 2>&1); then
         echo "Tag ${tag} exists. Verify that the new version is correct."
-        return 1
+        exit 1
     fi
-    return 0
 }
 
 function validate_new_version() {
@@ -325,16 +321,17 @@ function validate_new_version() {
         local new_version_segment=${new_version_array[i]}
         local latest_version_segment=${latest_version_array[i]}
         if ((${new_version_segment} > ${latest_version_segment})); then
+            echo "Upgrading from ${latest_version_string} to ${new_version_string}"
             return 0
         elif ((${new_version_segment} < ${latest_version_segment})); then
             echo "Cannot upgrade to specified version: new version (${new_version_string}) < latest version (${latest_version_string})"
-            return 1
+            exit 1
         fi
     done
 
     # Versions are equal
     echo "Cannot upgrade to specified version: new version = latest version (${latest_version_string})"
-    return 0
+    exit 1
 }
 
 function create_release_branch() {
@@ -378,7 +375,7 @@ function commit_and_push_changes() {
     local release_branch=$2
     local message=$3
 
-    if ! (on_branch ${repo_name} ${release_branch}); then return 1; fi
+    if ! (on_branch ${repo_name} ${release_branch}); then exit 1; fi
     local repo_path=$(get_local_repo_path ${repo_name})
     # stage changes (brute force, maybe too much)
     git -C ${repo_path} add --all
@@ -390,25 +387,6 @@ function commit_and_push_changes() {
     git -C ${repo_path} push -u origin ${release_branch}
     git -C ${repo_path} status
 }
-
-# function branch_has_new_commits() {
-#     local repo_name=$1
-#     local release_branch=$2
-
-#     if ! (on_branch ${repo_name} ${release_branch}); then return 1; fi
-#     local repo_path=$(get_local_repo_path ${repo_name})
-
-#     # Get the hash of the branch's initial commit
-#     local initial_commit_hash=$(git -C ${repo_path} rev-list --max-parents=0 HEAD)
-#     # get the hash of the last commit
-#     local last_commit_hash=$(git -C ${repo_path} rev-parse HEAD)
-
-#     # Compare the commit hashes
-#     if [ "${initial_commit_hash}" != "${last_commit_hash}" ]; then
-#         return 0
-#     fi
-#     return 1
-# }
 
 function branch_has_new_commits() {
     show_progress
@@ -478,21 +456,6 @@ function monitor_checks() {
         #set -e
     fi
 }
-
-# function release_exists_and_is_latest() {
-#     local repo_name=$1
-#     local tag=$2
-#     local repo=$(get_gh_repo_path ${repo_name})
-#     if (gh release list \
-#         --repo ${repo} \
-#         --json tagName,isLatest \
-#         --jq ".[] \
-#         | select(.tagName == \"${tag}\" and .isLatest == true)" >/dev/null 2>&1); then
-#         return 0
-#     else
-#         return 1
-#     fi
-# }
 
 function release_exists_and_is_latest() {
     local repo_name=$1
@@ -574,7 +537,6 @@ function update_cpp() {
     # push changes to remote
     git -C ${repo_path} push -u origin ${release_branch}
     git -C ${repo_path} status
-    return 0
 }
 
 function update_py() {
@@ -679,31 +641,20 @@ function release() {
 
     local tag=v${version}
 
-    if ! (release_exists_and_is_latest ${repo_name} ${tag}); then
-
-        local release_branch=release/${tag}
-
-        clone ${repo_name}
-
-        check_start_point ${repo_name} ${start_point}
-
-        check_tag ${repo_name} ${tag}
-
-        validate_new_version ${repo_name} ${version}
-
-        create_release_branch ${repo_name} ${release_branch} ${start_point}
-
-        ${update_repo} ${repo_name} ${release_branch}
-
-        create_pull_request ${repo_name} ${release_branch} ${tag}
-
-        monitor_checks ${repo_name} ${release_branch}
-
-        create_release ${repo_name} ${release_branch} ${tag}
-
-        merge_release_tag_into_base_branch ${repo_name} ${tag}
-    else
+    if (release_exists_and_is_latest ${repo_name} ${tag}); then
         echo "Release tagged as ${tag} exists and is set as latest. Skipping."
+    else
+        local release_branch=release/${tag}
+        clone ${repo_name}
+        check_start_point ${repo_name} ${start_point}
+        check_tag ${repo_name} ${tag}
+        validate_new_version ${repo_name} ${version}
+        create_release_branch ${repo_name} ${release_branch} ${start_point}
+        ${update_repo} ${repo_name} ${release_branch}
+        create_pull_request ${repo_name} ${release_branch} ${tag}
+        monitor_checks ${repo_name} ${release_branch}
+        create_release ${repo_name} ${release_branch} ${tag}
+        merge_release_tag_into_base_branch ${repo_name} ${tag}
     fi
 }
 
@@ -823,7 +774,10 @@ function download_wheels() {
         --pattern meshkernel-macos-*-Release \
         --dir ${py_wheels_dir}
     # move the wheels from the ${py_wheels_dir}/meshkernel-macos-* to ${py_wheels_dir}
-    find ${py_wheels_dir} -type d -name 'meshkernel-macos-*-Release' -exec sh -c 'mv "$1"/*.whl "$0"' "$py_wheels_dir" {} \;
+    find ${py_wheels_dir} \
+        -type d \
+        -name 'meshkernel-macos-*-Release' \
+        -exec sh -c 'mv "$1"/*.whl "$0"' "$py_wheels_dir" {} \;
     # then remove the unnecessary folders
     rm -fr ${py_wheels_dir}/meshkernel-macos-*
 }
@@ -872,16 +826,26 @@ function upload_wheel_assets_to_github() {
     show_progress
     local tag=$1
     local meshkernelpy_repo=$(get_gh_repo_path "MeshKernelPyTest")
-    gh release upload ${tag} ${work_dir}/artifacts/python_wheels/*.whl --repo ${meshkernelpy_repo} --clobber
+    gh release upload \
+        ${tag} ${work_dir}/artifacts/python_wheels/*.whl \
+        --repo ${meshkernelpy_repo} \
+        --clobber
 }
 
 function upload_nupkg_assets_to_github() {
     show_progress
     local tag=$1
     local meshkernel_repo=$(get_gh_repo_path "MeshKernelTest")
-    gh release upload ${tag} ${work_dir}/artifacts/nupkg/Deltares.MeshKernel.*.nupkg --repo ${meshkernel_repo} --clobber
+    gh release upload \
+        ${tag} ${work_dir}/artifacts/nupkg/Deltares.MeshKernel.*.nupkg \
+        --repo ${meshkernel_repo} \
+        --clobber
+
     local meshkernelnet_repo=$(get_gh_repo_path "MeshKernelNETTest")
-    gh release upload ${tag} ${work_dir}/artifacts/nupkg/MeshKernelNET.*.nupkg --repo ${meshkernelnet_repo} --clobber
+    gh release upload \
+        ${tag} ${work_dir}/artifacts/nupkg/MeshKernelNET.*.nupkg \
+        --repo ${meshkernelnet_repo} \
+        --clobber
 }
 
 function upload_wheels_to_pypi() {
