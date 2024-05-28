@@ -448,12 +448,10 @@ function monitor_checks() {
     if (pull_request_exists ${repo_name} ${release_branch}); then
         # monitor the checks, wait a little until they are registered
         sleep ${delay}
-        #set +e
         gh pr checks ${release_branch} \
             --repo ${repo} \
             --watch \
             --interval ${github_refresh_interval}
-        #set -e
     fi
 }
 
@@ -532,7 +530,7 @@ function update_cpp() {
     local release_branch=$2
     local repo_path=$(get_local_repo_path ${repo_name})
     # empty commit
-    git -C ${repo_path} commit --allow-empty -m "Trigger PR on $release_branch"
+    git -C ${repo_path} commit --allow-empty -m "Trigger PR for branch $release_branch"
     git -C ${repo_path} status
     # push changes to remote
     git -C ${repo_path} push -u origin ${release_branch}
@@ -655,6 +653,9 @@ function release() {
         monitor_checks ${repo_name} ${release_branch}
         create_release ${repo_name} ${release_branch} ${tag}
         merge_release_tag_into_base_branch ${repo_name} ${tag}
+        if [ "$repo_name" = "MeshKernelTest" ]; then
+            trigger_cpp ${release_branch} ${teamcity_access_token}
+        fi
     fi
 }
 
@@ -861,7 +862,7 @@ function upload_wheels_to_pypi() {
         ${work_dir}/artifacts/python_wheels/*.whl
 }
 
-function retrigger_cpp {
+function trigger_cpp {
     show_progress
     local release_branch=$1
     local teamcity_access_token=$2
@@ -911,7 +912,6 @@ function main() {
     create_conda_env
 
     release "MeshKernelTest" update_cpp
-    retrigger_cpp ${release_branch} ${teamcity_access_token}
     pin_and_tag_artifacts_cpp ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
     release "MeshKernelPyTest" update_py
