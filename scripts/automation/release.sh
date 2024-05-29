@@ -528,13 +528,14 @@ function update_cpp() {
     show_progress
     local repo_name=$1
     local release_branch=$2
-    local repo_path=$(get_local_repo_path ${repo_name})
-    # empty commit
-    git -C ${repo_path} commit --allow-empty -m "Trigger PR for branch $release_branch"
-    git -C ${repo_path} status
-    # push changes to remote
-    git -C ${repo_path} push -u origin ${release_branch}
-    git -C ${repo_path} status
+
+    # bump version of backend
+    local cmakelists_file=${work_dir}/${repo_name}/CMakeLists.txt
+    python $(get_scripts_path)/bump_mk_version.py \
+        --file ${cmakelists_file} \
+        --to_version ${version}
+    commit_and_push_changes ${repo_name} ${release_branch} \
+        "Release v${version} auto-update: bump version"
 }
 
 function update_py() {
@@ -542,14 +543,14 @@ function update_py() {
     local repo_name=$1
     local release_branch=$2
 
-    # update version of python bindings
+    # bump version of python bindings
     local python_version_file=${work_dir}/${repo_name}/meshkernel/version.py
     python $(get_scripts_path)/bump_mkpy_versions.py \
         --file ${python_version_file} \
         --to_version ${version} \
         --to_backend_version ${version}
     commit_and_push_changes ${repo_name} ${release_branch} \
-        "Release v${version} auto-update: update versions of python bindings"
+        "Release v${version} auto-update: bump versions of python bindings"
 }
 
 function update_net() {
@@ -557,7 +558,7 @@ function update_net() {
     local repo_name=$1
     local release_branch=$2
 
-    # update product version
+    # bump product version
     local nuspec_file=${work_dir}/${repo_name}/nuget/MeshKernelNET.nuspec
     local dir_build_props_file=${work_dir}/${repo_name}/Directory.Build.props
     python $(get_scripts_path)/bump_package_version.py \
@@ -566,9 +567,9 @@ function update_net() {
         --version_tag "MeshKernelNETVersion" \
         --to_version ${version}
     commit_and_push_changes ${repo_name} ${release_branch} \
-        "Release v${version} auto-update: update version of product"
+        "Release v${version} auto-update: bump version"
 
-    # update versions of dependencies
+    # bump versions of dependencies
     local meshkernel_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
             --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Build \
@@ -580,7 +581,7 @@ function update_net() {
         --dir_packages_props_file ${dir_package_props_file} \
         --to_versioned_packages "Deltares.MeshKernel:${version}.${meshkernel_build_number}"
     commit_and_push_changes ${repo_name} ${release_branch} \
-        "Release v${version} auto-update: update versions of dependencies"
+        "Release v${version} auto-update: bump versions of dependencies"
 }
 
 function rerun_all_workflows() {
@@ -653,9 +654,6 @@ function release() {
         monitor_checks ${repo_name} ${release_branch}
         create_release ${repo_name} ${release_branch} ${tag}
         merge_release_tag_into_base_branch ${repo_name} ${tag}
-        if [ "$repo_name" = "MeshKernelTest" ]; then
-            trigger_cpp ${release_branch} ${teamcity_access_token}
-        fi
     fi
 }
 
@@ -860,17 +858,6 @@ function upload_wheels_to_pypi() {
         --username __token__ \
         --password ${access_token} \
         ${work_dir}/artifacts/python_wheels/*.whl
-}
-
-function trigger_cpp {
-    show_progress
-    local release_branch=$1
-    local teamcity_access_token=$2
-    python $(get_scripts_path)/trigger_build.py \
-        --branch_name ${release_branch} \
-        --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Build \
-        --refresh_interval 10 \
-        --teamcity_access_token ${teamcity_access_token}
 }
 
 function create_conda_env() {
