@@ -582,7 +582,7 @@ function update_net() {
     # bump versions of dependencies
     local meshkernel_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernelBackEnd_Windows_Build \
+            --build_config_id GridEditor_MeshKernel_Windows_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
@@ -680,13 +680,13 @@ function pin_and_tag_artifacts_cpp() {
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name NuGetContent.zip \
-        --build_config_id GridEditor_MeshKernelBackEnd_Windows_Build \
+        --build_config_id GridEditor_MeshKernel_Windows_Build \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
     # get the pinned build number
     local meshkernel_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernelBackEnd_Windows_Build \
+            --build_config_id GridEditor_MeshKernel_Windows_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
@@ -694,7 +694,7 @@ function pin_and_tag_artifacts_cpp() {
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
-        --build_config_id GridEditor_MeshKernelBackEnd_Windows_Package_MeshKernelSigned \
+        --build_config_id GridEditor_MeshKernel_Windows_NuGet_MeshKernelSigned \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
 }
@@ -805,14 +805,14 @@ function download_nupkgs() {
 
     local meshkernel_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernelBackEnd_Windows_Build \
+            --build_config_id GridEditor_MeshKernel_Windows_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
     python $(get_scripts_path)/download_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
-        --build_config_id GridEditor_MeshKernelBackEnd_Windows_Package_MeshKernelSigned \
+        --build_config_id GridEditor_MeshKernel_Windows_NuGet_MeshKernelSigned \
         --tag ${tag} \
         --destination ${nupkg_dir} \
         --teamcity_access_token ${teamcity_access_token}
@@ -865,7 +865,6 @@ function upload_wheels_to_pypi() {
     local repo=$(get_gh_repo_path "MeshKernelPy")
     python -m twine upload \
         --verbose \
-        --repository-url https://pypi.org/project/meshkernel/ \
         --username __token__ \
         --password ${access_token} \
         ${work_dir}/artifacts/python_wheels/*.whl
