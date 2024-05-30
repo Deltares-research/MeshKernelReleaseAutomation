@@ -12,6 +12,8 @@ pypi_access_token=""
 teamcity_access_token=""
 clean=false
 
+source $(dirname $(realpath "$0"))/monitor_checks_on_branch.sh
+
 function col_echo() {
     local color=$1
     local text=$2
@@ -440,7 +442,7 @@ function create_pull_request() {
     fi
 }
 
-function monitor_checks() {
+function monitor_pull_request_checks() {
     show_progress
     local repo_name=$1
     local release_branch=$2
@@ -522,6 +524,14 @@ function merge_release_tag_into_base_branch() {
         git -C ${repo_path} push -u origin ${base_branch}
         git -C ${repo_path} status
     fi
+}
+
+function monitor_checks_on_base_branch() {
+    show_progress
+    local repo_name=$1
+    local base_branch=$(get_default_branch_name ${repo_name})
+    echo "${repo_name}" "${base_branch}"
+    monitor_checks_on_branch "${repo_name}" "${base_branch}"
 }
 
 function update_cpp() {
@@ -651,9 +661,10 @@ function release() {
         create_release_branch ${repo_name} ${release_branch} ${start_point}
         ${update_repo} ${repo_name} ${release_branch}
         create_pull_request ${repo_name} ${release_branch} ${tag}
-        monitor_checks ${repo_name} ${release_branch}
+        monitor_pull_request_checks ${repo_name} ${release_branch}
         create_release ${repo_name} ${release_branch} ${tag}
         merge_release_tag_into_base_branch ${repo_name} ${tag}
+        monitor_checks_on_base_branch ${repo_name}
     fi
 }
 
