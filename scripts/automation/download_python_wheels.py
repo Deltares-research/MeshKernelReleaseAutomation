@@ -61,7 +61,7 @@ def download_python_wheels(
 
     for platform, arch in build_configs.items():
         artifact = f"meshkernel-{version}-py3-none-{arch}.whl"
-        build_config_id = f"GridEditor_MeshKernelPyTest_{platform}_BuildPythonWheel"
+        build_config_id = f"GridEditor_MeshKernelPy_{platform}_BuildPythonWheel"
         run(
             branch,
             artifact,

@@ -3,7 +3,7 @@
 set -e
 
 repo_host=github.com
-repo_owner=Deltares-research
+repo_owner=Deltares
 
 github_refresh_interval=30 # seconds
 delay=${github_refresh_interval}
@@ -582,7 +582,7 @@ function update_net() {
     # bump versions of dependencies
     local meshkernel_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Build \
+            --build_config_id GridEditor_MeshKernelBackEnd_Windows_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
@@ -680,13 +680,13 @@ function pin_and_tag_artifacts_cpp() {
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name NuGetContent.zip \
-        --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Build \
+        --build_config_id GridEditor_MeshKernelBackEnd_Windows_Build \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
     # get the pinned build number
     local meshkernel_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Build \
+            --build_config_id GridEditor_MeshKernelBackEnd_Windows_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
@@ -694,7 +694,7 @@ function pin_and_tag_artifacts_cpp() {
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
-        --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Package_MeshKernelSigned \
+        --build_config_id GridEditor_MeshKernelBackEnd_Windows_Package_MeshKernelSigned \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
 }
@@ -710,14 +710,14 @@ function pin_and_tag_artifacts_py() {
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name meshkernel-${version}-py3-none-win_amd64.whl \
-        --build_config_id GridEditor_MeshKernelPyTest_Windows_BuildPythonWheel \
+        --build_config_id GridEditor_MeshKernelPy_Windows_BuildPythonWheel \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
 
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name meshkernel-${version}-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl \
-        --build_config_id GridEditor_MeshKernelPyTest_Linux_BuildPythonWheel \
+        --build_config_id GridEditor_MeshKernelPy_Linux_BuildPythonWheel \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
 }
@@ -734,13 +734,13 @@ function pin_and_tag_artifacts_net() {
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name output.zip \
-        --build_config_id GridEditor_MeshKernelNetTest_Build \
+        --build_config_id GridEditor_MeshKernelNet_Build \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
     # get the pinned build number
     local meshkernelnet_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernelNetTest_Build \
+            --build_config_id GridEditor_MeshKernelNet_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
@@ -748,7 +748,7 @@ function pin_and_tag_artifacts_net() {
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name MeshKernelNET.${version}.${meshkernelnet_build_number}.nupkg \
-        --build_config_id GridEditor_MeshKernelNetTest_NuGet_MeshKernelNETSigned \
+        --build_config_id GridEditor_MeshKernelNet_NuGet_MeshKernelNETSigned \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
 }
@@ -769,7 +769,7 @@ function download_wheels() {
         --destination ${py_wheels_dir} \
         --teamcity_access_token ${teamcity_access_token}
 
-    local repo=$(get_gh_repo_path "MeshKernelPyTest")
+    local repo=$(get_gh_repo_path "MeshKernelPy")
     local last_run_id=$(
         gh run list \
             --repo ${repo} \
@@ -805,28 +805,28 @@ function download_nupkgs() {
 
     local meshkernel_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Build \
+            --build_config_id GridEditor_MeshKernelBackEnd_Windows_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
     python $(get_scripts_path)/download_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
-        --build_config_id GridEditor_MeshKernelBackEndTest_Windows_Package_MeshKernelSigned \
+        --build_config_id GridEditor_MeshKernelBackEnd_Windows_Package_MeshKernelSigned \
         --tag ${tag} \
         --destination ${nupkg_dir} \
         --teamcity_access_token ${teamcity_access_token}
 
     local meshkernelnet_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernelNetTest_Build \
+            --build_config_id GridEditor_MeshKernelNet_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
     python $(get_scripts_path)/download_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name MeshKernelNET.${version}.${meshkernelnet_build_number}.nupkg \
-        --build_config_id GridEditor_MeshKernelNetTest_NuGet_MeshKernelNETSigned \
+        --build_config_id GridEditor_MeshKernelNet_NuGet_MeshKernelNETSigned \
         --tag ${tag} \
         --destination ${nupkg_dir} \
         --teamcity_access_token ${teamcity_access_token}
@@ -835,7 +835,7 @@ function download_nupkgs() {
 function upload_wheel_assets_to_github() {
     show_progress
     local tag=$1
-    local meshkernelpy_repo=$(get_gh_repo_path "MeshKernelPyTest")
+    local meshkernelpy_repo=$(get_gh_repo_path "MeshKernelPy")
     gh release upload \
         ${tag} ${work_dir}/artifacts/python_wheels/*.whl \
         --repo ${meshkernelpy_repo} \
@@ -845,13 +845,13 @@ function upload_wheel_assets_to_github() {
 function upload_nupkg_assets_to_github() {
     show_progress
     local tag=$1
-    local meshkernel_repo=$(get_gh_repo_path "MeshKernelTest")
+    local meshkernel_repo=$(get_gh_repo_path "MeshKernel")
     gh release upload \
         ${tag} ${work_dir}/artifacts/nupkg/Deltares.MeshKernel.*.nupkg \
         --repo ${meshkernel_repo} \
         --clobber
 
-    local meshkernelnet_repo=$(get_gh_repo_path "MeshKernelNETTest")
+    local meshkernelnet_repo=$(get_gh_repo_path "MeshKernelNET")
     gh release upload \
         ${tag} ${work_dir}/artifacts/nupkg/MeshKernelNET.*.nupkg \
         --repo ${meshkernelnet_repo} \
@@ -862,7 +862,7 @@ function upload_wheels_to_pypi() {
     show_progress
     local access_token_file=$1
     local access_token=$(<${access_token_file})
-    local repo=$(get_gh_repo_path "MeshKernelPyTest")
+    local repo=$(get_gh_repo_path "MeshKernelPy")
     python -m twine upload \
         --verbose \
         --repository-url https://pypi.org/project/meshkernel/ \
@@ -909,13 +909,13 @@ function main() {
 
     create_conda_env
 
-    release "MeshKernelTest" update_cpp
+    release "MeshKernel" update_cpp
     pin_and_tag_artifacts_cpp ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    release "MeshKernelPyTest" update_py
+    release "MeshKernelPy" update_py
     pin_and_tag_artifacts_py ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    release "MeshKernelNETTest" update_net
+    release "MeshKernelNET" update_net
     pin_and_tag_artifacts_net ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
     download_wheels ${release_branch} ${version} ${tag} ${teamcity_access_token}
