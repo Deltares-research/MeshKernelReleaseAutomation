@@ -862,7 +862,6 @@ function upload_wheels_to_pypi() {
     show_progress
     local access_token_file=$1
     local access_token=$(<${access_token_file})
-    local repo=$(get_gh_repo_path "MeshKernelPy")
     python -m twine upload \
         --verbose \
         --username __token__ \
