@@ -2,8 +2,17 @@
 
 set -e
 
-repo_host=github.com
-repo_owner=Deltares
+repo_host="github.com"
+
+# repo_owner="Deltares"
+# forked_repo_suffix=""
+
+repo_owner="Deltares-research"
+forked_repo_suffix="Test"
+
+repo_name_MeshKernel="MeshKernel"${forked_repo_suffix}
+repo_name_MeshKernelPy="MeshKernelPy"${forked_repo_suffix}
+repo_name_MeshKernelNET="MeshKernelNET"${forked_repo_suffix}
 
 github_refresh_interval=30 # seconds
 delay=${github_refresh_interval}
@@ -534,7 +543,7 @@ function monitor_checks_on_base_branch() {
     monitor_checks_on_branch "${repo_name}" "${base_branch}"
 }
 
-function update_cpp() {
+function update_MeshKernel() {
     show_progress
     local repo_name=$1
     local release_branch=$2
@@ -548,7 +557,7 @@ function update_cpp() {
         "Release v${version} auto-update: bump version"
 }
 
-function update_py() {
+function update_update_MeshKernelPy() {
     show_progress
     local repo_name=$1
     local release_branch=$2
@@ -563,7 +572,7 @@ function update_py() {
         "Release v${version} auto-update: bump versions of python bindings"
 }
 
-function update_net() {
+function update_MeshKernelNET() {
     show_progress
     local repo_name=$1
     local release_branch=$2
@@ -582,7 +591,7 @@ function update_net() {
     # bump versions of dependencies
     local meshkernel_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernel_Windows_Build \
+            --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
@@ -644,7 +653,6 @@ function release() {
     show_progress
 
     local repo_name=$1
-    local update_repo=$2
 
     print_box "${repo_name} Release v${version}"
 
@@ -659,7 +667,7 @@ function release() {
         check_tag ${repo_name} ${tag}
         validate_new_version ${repo_name} ${version}
         create_release_branch ${repo_name} ${release_branch} ${start_point}
-        ${update_repo} ${repo_name} ${release_branch}
+        update_${repo_name} ${repo_name} ${release_branch}
         create_pull_request ${repo_name} ${release_branch} ${tag}
         monitor_pull_request_checks ${repo_name} ${release_branch}
         create_release ${repo_name} ${release_branch} ${tag}
@@ -680,13 +688,13 @@ function pin_and_tag_artifacts_cpp() {
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name NuGetContent.zip \
-        --build_config_id GridEditor_MeshKernel_Windows_Build \
+        --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_Build \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
     # get the pinned build number
     local meshkernel_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernel_Windows_Build \
+            --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
@@ -694,7 +702,7 @@ function pin_and_tag_artifacts_cpp() {
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
-        --build_config_id GridEditor_MeshKernel_Windows_NuGet_MeshKernelSigned \
+        --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_NuGet_MeshKernelSigned \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
 }
@@ -710,14 +718,14 @@ function pin_and_tag_artifacts_py() {
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name meshkernel-${version}-py3-none-win_amd64.whl \
-        --build_config_id GridEditor_MeshKernelPy_Windows_BuildPythonWheel \
+        --build_config_id GridEditor_MeshKernelPy${forked_repo_suffix}_Windows_BuildPythonWheel \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
 
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name meshkernel-${version}-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl \
-        --build_config_id GridEditor_MeshKernelPy_Linux_BuildPythonWheel \
+        --build_config_id GridEditor_MeshKernelPy${forked_repo_suffix}_Linux_BuildPythonWheel \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
 }
@@ -734,13 +742,13 @@ function pin_and_tag_artifacts_net() {
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name output.zip \
-        --build_config_id GridEditor_MeshKernelNet_Build \
+        --build_config_id GridEditor_MeshKernelNet${forked_repo_suffix}_Build \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
     # get the pinned build number
     local meshkernelnet_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernelNet_Build \
+            --build_config_id GridEditor_MeshKernelNet${forked_repo_suffix}_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
@@ -748,7 +756,7 @@ function pin_and_tag_artifacts_net() {
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name MeshKernelNET.${version}.${meshkernelnet_build_number}.nupkg \
-        --build_config_id GridEditor_MeshKernelNet_NuGet_MeshKernelNETSigned \
+        --build_config_id GridEditor_MeshKernelNet${forked_repo_suffix}_NuGet_MeshKernelNETSigned \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
 }
@@ -769,7 +777,7 @@ function download_wheels() {
         --destination ${py_wheels_dir} \
         --teamcity_access_token ${teamcity_access_token}
 
-    local repo=$(get_gh_repo_path "MeshKernelPy")
+    local repo=$(get_gh_repo_path ${repo_name_MeshKernelPy})
     local last_run_id=$(
         gh run list \
             --repo ${repo} \
@@ -805,28 +813,28 @@ function download_nupkgs() {
 
     local meshkernel_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernel_Windows_Build \
+            --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
     python $(get_scripts_path)/download_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
-        --build_config_id GridEditor_MeshKernel_Windows_NuGet_MeshKernelSigned \
+        --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_NuGet_MeshKernelSigned \
         --tag ${tag} \
         --destination ${nupkg_dir} \
         --teamcity_access_token ${teamcity_access_token}
 
     local meshkernelnet_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_MeshKernelNet_Build \
+            --build_config_id GridEditor_MeshKernelNet${forked_repo_suffix}_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
     python $(get_scripts_path)/download_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name MeshKernelNET.${version}.${meshkernelnet_build_number}.nupkg \
-        --build_config_id GridEditor_MeshKernelNet_NuGet_MeshKernelNETSigned \
+        --build_config_id GridEditor_MeshKernelNet${forked_repo_suffix}_NuGet_MeshKernelNETSigned \
         --tag ${tag} \
         --destination ${nupkg_dir} \
         --teamcity_access_token ${teamcity_access_token}
@@ -835,7 +843,7 @@ function download_nupkgs() {
 function upload_wheel_assets_to_github() {
     show_progress
     local tag=$1
-    local meshkernelpy_repo=$(get_gh_repo_path "MeshKernelPy")
+    local meshkernelpy_repo=$(get_gh_repo_path ${repo_name_MeshKernelPy})
     gh release upload \
         ${tag} ${work_dir}/artifacts/python_wheels/*.whl \
         --repo ${meshkernelpy_repo} \
@@ -845,13 +853,13 @@ function upload_wheel_assets_to_github() {
 function upload_nupkg_assets_to_github() {
     show_progress
     local tag=$1
-    local meshkernel_repo=$(get_gh_repo_path "MeshKernel")
+    local meshkernel_repo=$(get_gh_repo_path ${repo_name_MeshKernel})
     gh release upload \
         ${tag} ${work_dir}/artifacts/nupkg/Deltares.MeshKernel.*.nupkg \
         --repo ${meshkernel_repo} \
         --clobber
 
-    local meshkernelnet_repo=$(get_gh_repo_path "MeshKernelNET")
+    local meshkernelnet_repo=$(get_gh_repo_path ${repo_name_MeshKernelNET})
     gh release upload \
         ${tag} ${work_dir}/artifacts/nupkg/MeshKernelNET.*.nupkg \
         --repo ${meshkernelnet_repo} \
@@ -907,13 +915,13 @@ function main() {
 
     create_conda_env
 
-    release "MeshKernel" update_cpp
+    release ${repo_name_MeshKernel}
     pin_and_tag_artifacts_cpp ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    release "MeshKernelPy" update_py
+    release ${repo_name_MeshKernelPy}
     pin_and_tag_artifacts_py ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    release "MeshKernelNET" update_net
+    release ${repo_name_MeshKernelNET}
     pin_and_tag_artifacts_net ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
     download_wheels ${release_branch} ${version} ${tag} ${teamcity_access_token}
