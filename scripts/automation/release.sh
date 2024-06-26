@@ -13,6 +13,7 @@ forked_repo_suffix="Test"
 repo_name_MeshKernel="MeshKernel"${forked_repo_suffix}
 repo_name_MeshKernelPy="MeshKernelPy"${forked_repo_suffix}
 repo_name_MeshKernelNET="MeshKernelNET"${forked_repo_suffix}
+repo_name_GridEditorPlugin="Grid_Editor_plugin"${forked_repo_suffix}
 
 github_refresh_interval=30 # seconds
 delay=${github_refresh_interval}
@@ -603,6 +604,37 @@ function update_MeshKernelNET() {
         "Release v${version} auto-update: bump versions of dependencies"
 }
 
+function update_GridEditorPlugin() {
+    show_progress
+    local repo_name=$1
+    local release_branch=$2
+
+    # bump product version
+    local nuspec_file=${work_dir}/${repo_name}/SDK/GridEditorDeltaShellPlugin.nuspec
+    local dir_build_props_file=${work_dir}/${repo_name}/Directory.Build.props
+    python $(get_scripts_path)/bump_package_version.py \
+        --nuspec_file ${nuspec_file} \
+        --dir_build_props_file ${dir_build_props_file} \
+        --version_tag "GridEditorPluginFileVersion" \
+        --to_version ${version}
+    commit_and_push_changes ${repo_name} ${release_branch} \
+        "Release v${version} auto-update: bump version"
+
+    # bump versions of dependencies
+    local meshkernelnet_build_number=$(
+        python $(get_scripts_path)/get_build_number.py \
+            --build_config_id GridEditor_MeshKernelNet${forked_repo_suffix}_Build \
+            --version ${version} \
+            --teamcity_access_token ${teamcity_access_token}
+    )
+    local dir_package_props_file=${work_dir}/${repo_name}/Directory.Packages.props
+    python $(get_scripts_path)/bump_dependencies_versions.py \
+        --dir_packages_props_file ${dir_package_props_file} \
+        --to_versioned_packages "MeshKernelNET:${version}.${meshkernelnet_build_number}"
+    commit_and_push_changes ${repo_name} ${release_branch} \
+        "Release v${version} auto-update: bump versions of dependencies"
+}
+
 function rerun_all_workflows() {
     show_progress
     local repo_name=$1
@@ -652,7 +684,8 @@ function print_box() {
 function release() {
     show_progress
 
-    local repo_name=$1
+    local product=$1
+    local repo_name=$2
 
     print_box "${repo_name} Release v${version}"
 
@@ -667,16 +700,17 @@ function release() {
         check_tag ${repo_name} ${tag}
         validate_new_version ${repo_name} ${version}
         create_release_branch ${repo_name} ${release_branch} ${start_point}
-        update_${repo_name} ${repo_name} ${release_branch}
+        update_${product} ${repo_name} ${release_branch}
         create_pull_request ${repo_name} ${release_branch} ${tag}
         monitor_pull_request_checks ${repo_name} ${release_branch}
         create_release ${repo_name} ${release_branch} ${tag}
+        pin_and_tag_artifacts_${product} ${release_branch} ${version} ${tag} ${teamcity_access_token}
         merge_release_tag_into_base_branch ${repo_name} ${tag}
         monitor_checks_on_base_branch ${repo_name}
     fi
 }
 
-function pin_and_tag_artifacts_cpp() {
+function pin_and_tag_artifacts_MeshKernel() {
     show_progress
 
     local release_branch=$1
@@ -707,7 +741,7 @@ function pin_and_tag_artifacts_cpp() {
         --teamcity_access_token ${teamcity_access_token}
 }
 
-function pin_and_tag_artifacts_py() {
+function pin_and_tag_artifacts_MeshKernelPy() {
     show_progress
 
     local release_branch=$1
@@ -730,7 +764,7 @@ function pin_and_tag_artifacts_py() {
         --teamcity_access_token ${teamcity_access_token}
 }
 
-function pin_and_tag_artifacts_net() {
+function pin_and_tag_artifacts_MeshKernelNET() {
     show_progress
 
     local release_branch=$1
@@ -761,7 +795,38 @@ function pin_and_tag_artifacts_net() {
         --teamcity_access_token ${teamcity_access_token}
 }
 
-function download_wheels() {
+function pin_and_tag_artifacts_GridEditorPlugin() {
+    show_progress
+
+    local release_branch=$1
+    local version=$2
+    local tag=$3
+    local teamcity_access_token=$4
+
+    # pin the last GridEditorPlugin build
+    python $(get_scripts_path)/pin_artifact.py \
+        --branch_name ${release_branch} \
+        --artifact_name bin.zip \
+        --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Build \
+        --tag ${tag} \
+        --teamcity_access_token ${teamcity_access_token}
+    # get the pinned build number
+    local grideditorplugin_build_number=$(
+        python $(get_scripts_path)/get_build_number.py \
+            --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Build \
+            --version ${version} \
+            --teamcity_access_token ${teamcity_access_token}
+    )
+    # pin the GridEditorPlugin nupkg
+    python $(get_scripts_path)/pin_artifact.py \
+        --branch_name ${release_branch} \
+        --artifact_name DeltaShell.Plugins.GridEditor.${version}.${grideditorplugin_build_number}.nupkg \
+        --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_NuGetPackageSigned \
+        --tag ${tag} \
+        --teamcity_access_token ${teamcity_access_token}
+}
+
+function download_python_wheels() {
     show_progress
     local release_branch=$1
     local version=$2
@@ -769,14 +834,27 @@ function download_wheels() {
     local teamcity_access_token=$4
 
     mkdir -p ${work_dir}/artifacts
-    local py_wheels_dir=${work_dir}/artifacts/python_wheels
-    mkdir ${py_wheels_dir}
+    local python_wheels_dir=${work_dir}/artifacts/python_wheels
+    mkdir -p ${python_wheels_dir}
 
-    python $(get_scripts_path)/download_python_wheels.py \
-        --version ${version} \
-        --destination ${py_wheels_dir} \
-        --teamcity_access_token ${teamcity_access_token}
+    # TeamCity wheels
+    local -A teamcity_build_configs
+    teamcity_build_configs=(
+        ["Windows"]="win_amd64"
+        ["Linux"]="manylinux_2_17_x86_64.manylinux2014_x86_64"
+    )
+    for platform in "${!teamcity_build_configs[@]}"; do
+        local arch=${teamcity_build_configs[${platform}]}
+        python $(get_scripts_path)/download_artifact.py \
+            --branch_name ${release_branch} \
+            --artifact_name meshkernel-${version}-py3-none-${arch}.whl \
+            --build_config_id GridEditor_MeshKernelPy${forked_repo_suffix}_${platform}_BuildPythonWheel \
+            --tag ${tag} \
+            --destination ${python_wheels_dir} \
+            --teamcity_access_token ${teamcity_access_token}
+    done
 
+    # Github wheels
     local repo=$(get_gh_repo_path ${repo_name_MeshKernelPy})
     local last_run_id=$(
         gh run list \
@@ -790,17 +868,17 @@ function download_wheels() {
     gh run download $last_run_id \
         --repo ${repo} \
         --pattern meshkernel-macos-*-Release \
-        --dir ${py_wheels_dir}
-    # move the wheels from the ${py_wheels_dir}/meshkernel-macos-* to ${py_wheels_dir}
-    find ${py_wheels_dir} \
+        --dir ${python_wheels_dir}
+    # move the wheels from the ${python_wheels_dir}/meshkernel-macos-* to ${python_wheels_dir}
+    find ${python_wheels_dir} \
         -type d \
         -name 'meshkernel-macos-*-Release' \
-        -exec sh -c 'mv "$1"/*.whl "$0"' "$py_wheels_dir" {} \;
+        -exec sh -c 'mv "$1"/*.whl "$0"' "$python_wheels_dir" {} \;
     # then remove the unnecessary folders
-    rm -fr ${py_wheels_dir}/meshkernel-macos-*
+    rm -fr ${python_wheels_dir}/meshkernel-macos-*
 }
 
-function download_nupkgs() {
+function download_nuget_packages() {
     show_progress
     local release_branch=$1
     local version=$2
@@ -808,9 +886,10 @@ function download_nupkgs() {
     local teamcity_access_token=$4
 
     mkdir -p ${work_dir}/artifacts
-    local nupkg_dir=${work_dir}/artifacts/nupkg
-    mkdir ${nupkg_dir}
+    local nuget_packages_dir=${work_dir}/artifacts/nuget_packages
+    mkdir -p ${nuget_packages_dir}
 
+    # MeshKernel
     local meshkernel_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
             --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_Build \
@@ -822,9 +901,10 @@ function download_nupkgs() {
         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
         --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_NuGet_MeshKernelSigned \
         --tag ${tag} \
-        --destination ${nupkg_dir} \
+        --destination ${nuget_packages_dir} \
         --teamcity_access_token ${teamcity_access_token}
 
+    # MeshKernelNET
     local meshkernelnet_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
             --build_config_id GridEditor_MeshKernelNet${forked_repo_suffix}_Build \
@@ -836,11 +916,26 @@ function download_nupkgs() {
         --artifact_name MeshKernelNET.${version}.${meshkernelnet_build_number}.nupkg \
         --build_config_id GridEditor_MeshKernelNet${forked_repo_suffix}_NuGet_MeshKernelNETSigned \
         --tag ${tag} \
-        --destination ${nupkg_dir} \
+        --destination ${nuget_packages_dir} \
+        --teamcity_access_token ${teamcity_access_token}
+
+    # GridEditorPlugin
+    local grideditorplugin_build_number=$(
+        python $(get_scripts_path)/get_build_number.py \
+            --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Build \
+            --version ${version} \
+            --teamcity_access_token ${teamcity_access_token}
+    )
+    python $(get_scripts_path)/download_artifact.py \
+        --branch_name ${release_branch} \
+        --artifact_name DeltaShell.Plugins.GridEditor.${version}.${grideditorplugin_build_number}.nupkg \
+        --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_NuGetPackageSigned \
+        --tag ${tag} \
+        --destination ${nuget_packages_dir} \
         --teamcity_access_token ${teamcity_access_token}
 }
 
-function upload_wheel_assets_to_github() {
+function upload_python_wheel_assets_to_github() {
     show_progress
     local tag=$1
     local meshkernelpy_repo=$(get_gh_repo_path ${repo_name_MeshKernelPy})
@@ -850,23 +945,30 @@ function upload_wheel_assets_to_github() {
         --clobber
 }
 
-function upload_nupkg_assets_to_github() {
+function upload_nuget_package_assets_to_github() {
     show_progress
     local tag=$1
+
     local meshkernel_repo=$(get_gh_repo_path ${repo_name_MeshKernel})
     gh release upload \
-        ${tag} ${work_dir}/artifacts/nupkg/Deltares.MeshKernel.*.nupkg \
+        ${tag} ${work_dir}/artifacts/nuget_packages/Deltares.MeshKernel.*.nupkg \
         --repo ${meshkernel_repo} \
         --clobber
 
     local meshkernelnet_repo=$(get_gh_repo_path ${repo_name_MeshKernelNET})
     gh release upload \
-        ${tag} ${work_dir}/artifacts/nupkg/MeshKernelNET.*.nupkg \
+        ${tag} ${work_dir}/artifacts/nuget_packages/MeshKernelNET.*.nupkg \
         --repo ${meshkernelnet_repo} \
+        --clobber
+
+    local grideditorplugin_repo=$(get_gh_repo_path ${repo_name_GridEditorPlugin})
+    gh release upload \
+        ${tag} ${work_dir}/artifacts/nuget_packages/DeltaShell.Plugins.GridEditor.*.nupkg \
+        --repo ${grideditorplugin_repo} \
         --clobber
 }
 
-function upload_wheels_to_pypi() {
+function upload_python_wheels_to_pypi() {
     show_progress
     local access_token_file=$1
     local access_token=$(<${access_token_file})
@@ -915,22 +1017,23 @@ function main() {
 
     create_conda_env
 
-    release ${repo_name_MeshKernel}
-    pin_and_tag_artifacts_cpp ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    release "MeshKernel" ${repo_name_MeshKernel}
+    release "MeshKernelPy" ${repo_name_MeshKernelPy}
+    release "MeshKernelNET" ${repo_name_MeshKernelNET}
+    release "GridEditorPlugin" ${repo_name_GridEditorPlugin}
 
-    release ${repo_name_MeshKernelPy}
-    pin_and_tag_artifacts_py ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    # pin_and_tag_artifacts_MeshKernel ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    # pin_and_tag_artifacts_MeshKernelPy ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    # pin_and_tag_artifacts_MeshKernelNET ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    # pin_and_tag_artifacts_GridEditorPlugin ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    release ${repo_name_MeshKernelNET}
-    pin_and_tag_artifacts_net ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    download_python_wheels ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    download_nuget_packages ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    download_wheels ${release_branch} ${version} ${tag} ${teamcity_access_token}
-    download_nupkgs ${release_branch} ${version} ${tag} ${teamcity_access_token}
-
-    upload_wheel_assets_to_github ${tag}
-    upload_nupkg_assets_to_github ${tag}
+    upload_python_wheel_assets_to_github ${tag}
+    upload_nuget_package_assets_to_github ${tag}
     if ${upload_to_pypi}; then
-        upload_wheels_to_pypi ${pypi_access_token}
+        upload_python_wheels_to_pypi ${pypi_access_token}
     fi
 
     remove_conda_env
