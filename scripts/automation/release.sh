@@ -17,6 +17,7 @@ repo_name_GridEditorPlugin="Grid_Editor_plugin"${forked_repo_suffix}
 
 github_refresh_interval=30 # seconds
 delay=${github_refresh_interval}
+release_grid_editor_plugin=false
 upload_to_pypi=false
 pypi_access_token=""
 teamcity_access_token=""
@@ -84,22 +85,24 @@ function usage {
     echo "Usage: $0 [OPTIONS]"
     echo "Creates a new release."
     echo " Options:"
-    echo "  --work_dir                 Required   string   Path to the work directory"
-    echo "  --version                  Required   string   Semantic version of new release"
-    echo "  --start_point              Required   string   ID of commit, branch or tag to check out"
-    echo "                                                 If a branch is specified, the HEAD of the branch is checked out"
-    echo "  --github_access_token      Required   string   Path to github access token"
-    echo "  --github_refresh_interval  Optional   integer  Refresh interval in seconds."
-    echo "  --upload_to_pypi           Optional            If supplied, the python wheels are uploaded to PyPi"
-    echo "  --pypi_access_token        Dependent  string   Path to PyPi access token"
-    echo "                                                 Required if --upload_to_pypi is provided, ignored otherwise"
-    echo "  --teamcity_access_token    Dependent  string   Path to teamcity access token"
-    echo "                                                 Required if --upload_to_pypi is provided, ignored otherwise"
-    echo "                                                 Used as a refresh interval while watching github PR checks (default = 30s)"
-    echo "  --delay                    Optional   integer  Delay in seconds"
-    echo "                                                 The script sleeps for this duration before watching github PR checks (default = 30s)"
-    echo "  --clean                    Optional            If supplied, the work directory is removed upon completion"
-    echo "  --help                                         Display this help and exit"
+    echo "  --work_dir                    Required   string   Path to the work directory"
+    echo "  --version                     Required   string   Semantic version of new release"
+    echo "  --release_grid_editor_plugin  Optional            If supplied, Grid Editor plugin is released beside"
+    echo "                                                    MeshKernel, MeshKernelPy and MeshKernelNET."
+    echo "  --start_point                 Required   string   ID of commit, branch or tag to check out"
+    echo "                                                    If a branch is specified, the HEAD of the branch is checked out"
+    echo "  --github_access_token         Required   string   Path to github access token"
+    echo "  --upload_to_pypi              Optional            If supplied, the python wheels are uploaded to PyPi"
+    echo "  --pypi_access_token           Dependent  string   Path to PyPi access token"
+    echo "                                                    Required if --upload_to_pypi is provided, ignored otherwise"
+    echo "  --teamcity_access_token       Dependent  string   Path to teamcity access token"
+    echo "                                                    Required if --upload_to_pypi is provided, ignored otherwise"
+    echo "  --github_refresh_interval     Optional   integer  Refresh interval in seconds."
+    echo "                                                    Used as a refresh interval while watching github PR checks (default = 30s)"
+    echo "  --delay                       Optional   integer  Delay in seconds"
+    echo "                                                    The script sleeps for this duration before watching github PR checks (default = 30s)"
+    echo "  --clean                       Optional            If supplied, the work directory is removed upon completion"
+    echo "  --help                                            Display this help and exit"
     echo ""
 }
 
@@ -123,6 +126,10 @@ function parse_arguments() {
             declare -g version="$2"
             shift # past argument
             shift # past value
+            ;;
+        --release_grid_editor_plugin)
+            declare -g release_grid_editor_plugin=true
+            shift # past argument
             ;;
         --start_point)
             declare -g start_point="$2"
@@ -920,19 +927,21 @@ function download_nuget_packages() {
         --teamcity_access_token ${teamcity_access_token}
 
     # GridEditorPlugin
-    local grideditorplugin_build_number=$(
-        python $(get_scripts_path)/get_build_number.py \
-            --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Build \
-            --version ${version} \
+    if ${release_grid_editor_plugin}; then
+        local grideditorplugin_build_number=$(
+            python $(get_scripts_path)/get_build_number.py \
+                --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Build \
+                --version ${version} \
+                --teamcity_access_token ${teamcity_access_token}
+        )
+        python $(get_scripts_path)/download_artifact.py \
+            --branch_name ${release_branch} \
+            --artifact_name DeltaShell.Plugins.GridEditor.${version}.${grideditorplugin_build_number}.nupkg \
+            --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_NuGetPackageSigned \
+            --tag ${tag} \
+            --destination ${nuget_packages_dir} \
             --teamcity_access_token ${teamcity_access_token}
-    )
-    python $(get_scripts_path)/download_artifact.py \
-        --branch_name ${release_branch} \
-        --artifact_name DeltaShell.Plugins.GridEditor.${version}.${grideditorplugin_build_number}.nupkg \
-        --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_NuGetPackageSigned \
-        --tag ${tag} \
-        --destination ${nuget_packages_dir} \
-        --teamcity_access_token ${teamcity_access_token}
+    fi
 }
 
 function upload_python_wheel_assets_to_github() {
@@ -961,11 +970,13 @@ function upload_nuget_package_assets_to_github() {
         --repo ${meshkernelnet_repo} \
         --clobber
 
-    local grideditorplugin_repo=$(get_gh_repo_path ${repo_name_GridEditorPlugin})
-    gh release upload \
-        ${tag} ${work_dir}/artifacts/nuget_packages/DeltaShell.Plugins.GridEditor.*.nupkg \
-        --repo ${grideditorplugin_repo} \
-        --clobber
+    if ${release_grid_editor_plugin}; then
+        local grideditorplugin_repo=$(get_gh_repo_path ${repo_name_GridEditorPlugin})
+        gh release upload \
+            ${tag} ${work_dir}/artifacts/nuget_packages/DeltaShell.Plugins.GridEditor.*.nupkg \
+            --repo ${grideditorplugin_repo} \
+            --clobber
+    fi
 }
 
 function upload_python_wheels_to_pypi() {
@@ -1020,12 +1031,16 @@ function main() {
     release "MeshKernel" ${repo_name_MeshKernel}
     release "MeshKernelPy" ${repo_name_MeshKernelPy}
     release "MeshKernelNET" ${repo_name_MeshKernelNET}
-    release "GridEditorPlugin" ${repo_name_GridEditorPlugin}
+    if ${release_grid_editor_plugin}; then
+        release "GridEditorPlugin" ${repo_name_GridEditorPlugin}
+    fi
 
     # pin_and_tag_artifacts_MeshKernel ${release_branch} ${version} ${tag} ${teamcity_access_token}
     # pin_and_tag_artifacts_MeshKernelPy ${release_branch} ${version} ${tag} ${teamcity_access_token}
     # pin_and_tag_artifacts_MeshKernelNET ${release_branch} ${version} ${tag} ${teamcity_access_token}
-    # pin_and_tag_artifacts_GridEditorPlugin ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    # if ${release_grid_editor_plugin}; then
+    #     pin_and_tag_artifacts_GridEditorPlugin ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    # fi
 
     download_python_wheels ${release_branch} ${version} ${tag} ${teamcity_access_token}
     download_nuget_packages ${release_branch} ${version} ${tag} ${teamcity_access_token}
