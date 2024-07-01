@@ -77,7 +77,7 @@ def wait_for_build(
     build_url = f"{BUILDS_ROOT}/{build_id}"
 
     # Poll for the build state until it's finished then check if it was successful
-    print(f"Waiting for build with id {build_id}..")
+    print(f"Waiting for build with id {build_id}...")
     while True:
         response = request.get(build_url)
         json_content = response.json()

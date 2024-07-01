@@ -2,7 +2,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from download_artifact import run
+from scripts.automation.download_teamcity_artifact import run
 from versioning import check_semantic_version
 
 

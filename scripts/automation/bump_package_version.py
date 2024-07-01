@@ -30,7 +30,7 @@ def parse_args() -> Path:
         "--version_tag",
         type=str,
         required=True,
-        help="T.",
+        help="The xml tag of the version",
     )
 
     parser.add_argument(
@@ -46,7 +46,6 @@ def parse_args() -> Path:
 def bump_nuspec_version(nuspec_file: Path, to_version: str):
     """
     Bumps the version in the nuspec configuration.
-    Ars:
     """
 
     # Parse the XML file
@@ -73,7 +72,9 @@ def bump_nuspec_version(nuspec_file: Path, to_version: str):
 
 
 def bump_dir_build_props_version(
-    dir_build_props_file: Path, version_tag: str, to_version: str
+    dir_build_props_file: Path,
+    version_tag: str,
+    to_version: str,
 ):
     """
     Get the nuspec version by parsing a nuspec file

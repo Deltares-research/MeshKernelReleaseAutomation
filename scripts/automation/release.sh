@@ -18,6 +18,7 @@ repo_name_GridEditorPlugin="Grid_Editor_plugin"${forked_repo_suffix}
 github_refresh_interval=30 # seconds
 delay=${github_refresh_interval}
 release_grid_editor_plugin=false
+dhydro_suite_version=""
 upload_to_pypi=false
 pypi_access_token=""
 teamcity_access_token=""
@@ -78,7 +79,7 @@ function catch() {
 trap 'catch $?' EXIT
 
 function show_progress() {
-    col_echo --blue ">> Executing: ${FUNCNAME[1]}"
+    col_echo --blue ">> ${FUNCNAME[1]}"
 }
 
 function usage {
@@ -89,14 +90,15 @@ function usage {
     echo "  --version                     Required   string   Semantic version of new release"
     echo "  --release_grid_editor_plugin  Optional            If supplied, Grid Editor plugin is released beside"
     echo "                                                    MeshKernel, MeshKernelPy and MeshKernelNET."
+    echo "  --dhydro_suite_version        Dependent  string   Version of D-HYDRO suite"
+    echo "                                                    Required if --release_grid_editor_plugin is provided, ignored otherwise"
     echo "  --start_point                 Required   string   ID of commit, branch or tag to check out"
     echo "                                                    If a branch is specified, the HEAD of the branch is checked out"
     echo "  --github_access_token         Required   string   Path to github access token"
     echo "  --upload_to_pypi              Optional            If supplied, the python wheels are uploaded to PyPi"
     echo "  --pypi_access_token           Dependent  string   Path to PyPi access token"
     echo "                                                    Required if --upload_to_pypi is provided, ignored otherwise"
-    echo "  --teamcity_access_token       Dependent  string   Path to teamcity access token"
-    echo "                                                    Required if --upload_to_pypi is provided, ignored otherwise"
+    echo "  --teamcity_access_token       Required  string   Path to teamcity access token"
     echo "  --github_refresh_interval     Optional   integer  Refresh interval in seconds."
     echo "                                                    Used as a refresh interval while watching github PR checks (default = 30s)"
     echo "  --delay                       Optional   integer  Delay in seconds"
@@ -130,6 +132,11 @@ function parse_arguments() {
         --release_grid_editor_plugin)
             declare -g release_grid_editor_plugin=true
             shift # past argument
+            ;;
+        --dhydro_suite_version)
+            declare -g dhydro_suite_version="$2"
+            shift # past argument
+            shift # past value
             ;;
         --start_point)
             declare -g start_point="$2"
@@ -185,16 +192,19 @@ function parse_arguments() {
 
     # required parameters
     if [[ -z ${work_dir} ]]; then
-        echo "Missing parameter --work_dir"
+        echo "Missing parameter --work_dir."
         do_exit=true
     elif [[ -z ${version} ]]; then
-        echo "Missing parameter --version"
+        echo "Missing parameter --version."
         do_exit=true
     elif [[ -z ${start_point} ]]; then
-        echo "Missing parameter --start_point"
+        echo "Missing parameter --start_point."
         do_exit=true
     elif [[ -z ${github_access_token} ]]; then
-        echo "Missing parameter --github_access_token"
+        echo "Missing parameter --github_access_token."
+        do_exit=true
+    elif ! test -f "${teamcity_access_token}"; then
+        echo "Missing parameter --teamcity_access_token."
         do_exit=true
     fi
 
@@ -204,8 +214,11 @@ function parse_arguments() {
             echo "Missing parameter --pypi_access_token: required when --upload_to_pypi is provided."
             do_exit=true
         fi
-        if ! test -f "${teamcity_access_token}"; then
-            echo "Missing parameter --teamcity_access_token: required when --upload_to_pypi is provided."
+    fi
+
+    if ${release_grid_editor_plugin}; then
+        if [[ -z ${dhydro_suite_version} ]]; then
+            echo "Missing parameter --dhydro_suite_version"
             do_exit=true
         fi
     fi
@@ -565,7 +578,7 @@ function update_MeshKernel() {
         "Release v${version} auto-update: bump version"
 }
 
-function update_update_MeshKernelPy() {
+function update_MeshKernelPy() {
     show_progress
     local repo_name=$1
     local release_branch=$2
@@ -640,6 +653,17 @@ function update_GridEditorPlugin() {
         --to_versioned_packages "MeshKernelNET:${version}.${meshkernelnet_build_number}"
     commit_and_push_changes ${repo_name} ${release_branch} \
         "Release v${version} auto-update: bump versions of dependencies"
+
+    # bump msi versions
+    local dir_wix_config=${work_dir}/${repo_name}/setup/GridEditor
+    python $(get_scripts_path)//bump_gep_msi_version.py \
+        --wix_ui_variables_file ${dir_wix_config}/WixUI/WixUIVariables.wxl \
+        --wix_proj_file ${dir_wix_config}/GridEditor.wixproj \
+        --to_release_version ${version} \
+        --to_public_release_version ${dhydro_suite_version}
+
+    commit_and_push_changes ${repo_name} ${release_branch} \
+        "Release v${version} auto-update: bump versions of wix configuration"
 }
 
 function rerun_all_workflows() {
@@ -818,7 +842,7 @@ function pin_and_tag_artifacts_GridEditorPlugin() {
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
     # get the pinned build number
-    local grideditorplugin_build_number=$(
+    local grideditorplugin_nupkg_build_number=$(
         python $(get_scripts_path)/get_build_number.py \
             --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Build \
             --version ${version} \
@@ -827,9 +851,26 @@ function pin_and_tag_artifacts_GridEditorPlugin() {
     # pin the GridEditorPlugin nupkg
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
-        --artifact_name DeltaShell.Plugins.GridEditor.${version}.${grideditorplugin_build_number}.nupkg \
+        --artifact_name DeltaShell.Plugins.GridEditor.${version}.${grideditorplugin_nupkg_build_number}.nupkg \
         --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_NuGetPackageSigned \
         --tag ${tag} \
+        --teamcity_access_token ${teamcity_access_token}
+
+    # pin the GridEditorPlugin msi
+    local grideditorplugin_msi_build_number=$(
+        python $(get_scripts_path)/get_build_number.py \
+            --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_StandAloneInstaller \
+            --version ${version} \
+            --last_successful_build \
+            --teamcity_access_token ${teamcity_access_token}
+    )
+    local msi_file_name="GridEditor ${dhydro_suite_version} Stand-alone (${grideditorplugin_msi_build_number}).msi"
+    python $(get_scripts_path)/pin_artifact.py \
+        --branch_name ${release_branch} \
+        --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_StandAloneInstaller \
+        --tag ${tag} \
+        --artifact_path "setup/GridEditor/bin/Release/stand-alone" \
+        --artifact_name "${msi_file_name}" \
         --teamcity_access_token ${teamcity_access_token}
 }
 
@@ -852,7 +893,7 @@ function download_python_wheels() {
     )
     for platform in "${!teamcity_build_configs[@]}"; do
         local arch=${teamcity_build_configs[${platform}]}
-        python $(get_scripts_path)/download_artifact.py \
+        python $(get_scripts_path)/download_teamcity_artifact.py \
             --branch_name ${release_branch} \
             --artifact_name meshkernel-${version}-py3-none-${arch}.whl \
             --build_config_id GridEditor_MeshKernelPy${forked_repo_suffix}_${platform}_BuildPythonWheel \
@@ -903,7 +944,7 @@ function download_nuget_packages() {
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
-    python $(get_scripts_path)/download_artifact.py \
+    python $(get_scripts_path)/download_teamcity_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
         --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_NuGet_MeshKernelSigned \
@@ -918,7 +959,7 @@ function download_nuget_packages() {
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
-    python $(get_scripts_path)/download_artifact.py \
+    python $(get_scripts_path)/download_teamcity_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name MeshKernelNET.${version}.${meshkernelnet_build_number}.nupkg \
         --build_config_id GridEditor_MeshKernelNet${forked_repo_suffix}_NuGet_MeshKernelNETSigned \
@@ -934,7 +975,7 @@ function download_nuget_packages() {
                 --version ${version} \
                 --teamcity_access_token ${teamcity_access_token}
         )
-        python $(get_scripts_path)/download_artifact.py \
+        python $(get_scripts_path)/download_teamcity_artifact.py \
             --branch_name ${release_branch} \
             --artifact_name DeltaShell.Plugins.GridEditor.${version}.${grideditorplugin_build_number}.nupkg \
             --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_NuGetPackageSigned \
@@ -944,36 +985,87 @@ function download_nuget_packages() {
     fi
 }
 
-function upload_python_wheel_assets_to_github() {
+function download_msi() {
+    show_progress
+    local release_branch=$1
+    local version=$2
+    local tag=$3
+    local teamcity_access_token=$4
+
+    mkdir -p ${work_dir}/artifacts
+    local msi_dir=${work_dir}/artifacts/msi
+    mkdir -p ${msi_dir}
+
+    # GridEditorPlugin
+    if ${release_grid_editor_plugin}; then
+        local build_config_id="GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_StandAloneInstaller"
+        local grideditorplugin_build_number=$(
+            python $(get_scripts_path)/get_build_number.py \
+                --build_config_id ${build_config_id} \
+                --version ${version} \
+                --teamcity_access_token ${teamcity_access_token}
+        )
+
+        local msi_file_name="GridEditor ${dhydro_suite_version} Stand-alone (${grideditorplugin_build_number}).msi"
+
+        python $(get_scripts_path)/download_teamcity_artifact.py \
+            --branch_name ${release_branch} \
+            --artifact_path "setup/GridEditor/bin/Release/stand-alone" \
+            --artifact_name "${msi_file_name}" \
+            --build_config_id ${build_config_id} \
+            --tag ${tag} \
+            --destination ${msi_dir} \
+            --teamcity_access_token ${teamcity_access_token}
+    fi
+}
+
+function upload_python_wheels_to_github() {
     show_progress
     local tag=$1
     local meshkernelpy_repo=$(get_gh_repo_path ${repo_name_MeshKernelPy})
-    gh release upload \
-        ${tag} ${work_dir}/artifacts/python_wheels/*.whl \
-        --repo ${meshkernelpy_repo} \
-        --clobber
+    for wheel in "${work_dir}/artifacts/python_wheels"/*".whl"; do
+        echo "Uploading MeshKernel ${wheel}..."
+        gh release upload ${tag} ${wheel} \
+            --repo ${meshkernelpy_repo} \
+            --clobber
+    done
 }
 
-function upload_nuget_package_assets_to_github() {
+function upload_nuget_packages_to_github() {
     show_progress
     local tag=$1
 
+    echo "Uploading MeshKernel nupkg..."
     local meshkernel_repo=$(get_gh_repo_path ${repo_name_MeshKernel})
     gh release upload \
         ${tag} ${work_dir}/artifacts/nuget_packages/Deltares.MeshKernel.*.nupkg \
         --repo ${meshkernel_repo} \
         --clobber
 
+    echo "Uploading MeshKernelNET nupkg..."
     local meshkernelnet_repo=$(get_gh_repo_path ${repo_name_MeshKernelNET})
     gh release upload \
         ${tag} ${work_dir}/artifacts/nuget_packages/MeshKernelNET.*.nupkg \
         --repo ${meshkernelnet_repo} \
         --clobber
 
+    echo "Uploading GridEditor nupkg..."
     if ${release_grid_editor_plugin}; then
         local grideditorplugin_repo=$(get_gh_repo_path ${repo_name_GridEditorPlugin})
         gh release upload \
             ${tag} ${work_dir}/artifacts/nuget_packages/DeltaShell.Plugins.GridEditor.*.nupkg \
+            --repo ${grideditorplugin_repo} \
+            --clobber
+    fi
+}
+
+function upload_msi_to_github() {
+    show_progress
+    local tag=$1
+    if ${release_grid_editor_plugin}; then
+        local grideditorplugin_repo=$(get_gh_repo_path ${repo_name_GridEditorPlugin})
+        gh release upload \
+            ${tag} ${work_dir}/artifacts/msi/GridEditor*.msi \
             --repo ${grideditorplugin_repo} \
             --clobber
     fi
@@ -1044,9 +1136,11 @@ function main() {
 
     download_python_wheels ${release_branch} ${version} ${tag} ${teamcity_access_token}
     download_nuget_packages ${release_branch} ${version} ${tag} ${teamcity_access_token}
+    download_msi ${release_branch} ${version} ${tag} ${teamcity_access_token}
 
-    upload_python_wheel_assets_to_github ${tag}
-    upload_nuget_package_assets_to_github ${tag}
+    upload_python_wheels_to_github ${tag}
+    upload_nuget_packages_to_github ${tag}
+    upload_msi_to_github ${tag}
     if ${upload_to_pypi}; then
         upload_python_wheels_to_pypi ${pypi_access_token}
     fi

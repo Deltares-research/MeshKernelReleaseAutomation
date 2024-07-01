@@ -112,7 +112,12 @@ def untag_build(build_info: dict, tag: str, request: RequestWrapper) -> None:
     request.put_json(tag_url, new_tags)
 
 
-def has_artifact(build_url: str, artifact_name: str, request: RequestWrapper) -> bool:
+def has_artifact(
+    build_url: str,
+    artifact_path: str,
+    artifact_name: str,
+    request: RequestWrapper,
+) -> bool:
     """
     Returns whether or not the specified build has the valid artifact
 
@@ -124,7 +129,9 @@ def has_artifact(build_url: str, artifact_name: str, request: RequestWrapper) ->
         request : RequestWrapper
             The request wrapper to make requests calls.
     """
-    build_artifacts_url = f"{build_url}artifacts/"
+    build_artifacts_url = f"{build_url}/artifacts/"
+    if artifact_path:
+        build_artifacts_url = f"{build_artifacts_url}/{artifact_path}"
     artifacts_response = request.get(build_artifacts_url)
 
     if artifacts_response.status_code != 200:
@@ -134,7 +141,11 @@ def has_artifact(build_url: str, artifact_name: str, request: RequestWrapper) ->
 
 
 def get_new_build(
-    branch_name: str, build_config_id: str, artifact_name: str, request: RequestWrapper
+    branch_name: str,
+    build_config_id: str,
+    artifact_path: str,
+    artifact_name: str,
+    request: RequestWrapper,
 ) -> Optional[Dict]:
     """
     Get the build from build_config with the specified artifact.
@@ -159,9 +170,9 @@ def get_new_build(
     builds = new_builds_response.json()
     for build in builds["build"]:
 
-        new_build_url = f"{BUILDS_ROOT}/id:{build['id']}/"
+        new_build_url = f"{BUILDS_ROOT}/id:{build['id']}"
 
-        if not has_artifact(new_build_url, artifact_name, request):
+        if not has_artifact(new_build_url, artifact_path, artifact_name, request):
             continue
 
         new_build_info = request.get(new_build_url)
@@ -236,9 +247,10 @@ def bag_build(build_info: dict, tag: str, request: RequestWrapper) -> None:
 
 def pin_artifact(
     branch_name: str,
-    artifact_name: str,
     build_config_id: str,
     tag: str,
+    artifact_path: str,
+    artifact_name: str,
     request: RequestWrapper,
 ):
     """
@@ -255,11 +267,22 @@ def pin_artifact(
             The request wrapper to make requests calls.
     """
 
-    old_build_info = get_previous_build(branch_name, build_config_id, tag, request)
+    old_build_info = get_previous_build(
+        branch_name,
+        build_config_id,
+        tag,
+        request,
+    )
     if old_build_info:
         clean_build(old_build_info, tag, request)
 
-    new_build_info = get_new_build(branch_name, build_config_id, artifact_name, request)
+    new_build_info = get_new_build(
+        branch_name,
+        build_config_id,
+        artifact_path,
+        artifact_name,
+        request,
+    )
     if new_build_info:
         bag_build(new_build_info, tag, request)
     else:
@@ -284,6 +307,13 @@ def parse_arguments():
         help="The branch name.",
     )
 
+    parser.add_argument(
+        "--artifact_path",
+        type=str,
+        required=False,
+        default="",
+        help="The path of the artifact to download. If not specified, the TeamCity root download dir is assumed.",
+    )
     parser.add_argument(
         "--artifact_name",
         type=str,
@@ -317,9 +347,10 @@ def parse_arguments():
 
 def run(
     branch_name: str,
-    artifact_name: str,
     build_config_id: str,
     tag: str,
+    artifact_path: str,
+    artifact_name: str,
     teamcity_access_token: str,
 ):
     """
@@ -336,10 +367,19 @@ def run(
             The tag to pin the build of the specified artifact with.
         teamcity_access_token : str
             The TeamCity access token to authenticate with.
+        artifact_path : str
+            The path of the artifact to pin and tag.
     """
 
     request = RequestWrapper(teamcity_access_token)
-    pin_artifact(branch_name, artifact_name, build_config_id, tag, request)
+    pin_artifact(
+        branch_name,
+        build_config_id,
+        tag,
+        artifact_path,
+        artifact_name,
+        request,
+    )
 
 
 if __name__ == "__main__":
@@ -347,9 +387,10 @@ if __name__ == "__main__":
         args = parse_arguments()
         run(
             args.branch_name,
-            args.artifact_name,
             args.build_config_id,
             args.tag,
+            args.artifact_path,
+            args.artifact_name,
             args.teamcity_access_token.read(),
         )
     except Exception as error:
