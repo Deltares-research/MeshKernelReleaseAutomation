@@ -426,7 +426,7 @@ function branch_has_new_commits() {
     local start_point=$2
     local release_branch=$3
     local repo_path=$(get_local_repo_path ${repo_name})
-    # is this really te best way?
+    # is this really the best way?
     echo "Checking if ${release_branch} has new commits on top of ${start_point}..."
     if [ -n "$(git -C ${repo_path} log --oneline ${start_point}..${release_branch})" ]; then
         echo "Found new commits"
