@@ -4,11 +4,11 @@ set -e
 
 repo_host="github.com"
 
-# repo_owner="Deltares"
-# forked_repo_suffix=""
+repo_owner="Deltares"
+forked_repo_suffix=""
 
-repo_owner="Deltares-research"
-forked_repo_suffix="Test"
+#repo_owner="Deltares-research"
+#forked_repo_suffix="Test"
 
 repo_name_MeshKernel="MeshKernel"${forked_repo_suffix}
 repo_name_MeshKernelPy="MeshKernelPy"${forked_repo_suffix}
