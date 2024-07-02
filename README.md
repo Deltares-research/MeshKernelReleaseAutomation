@@ -19,7 +19,7 @@ Usage:
     <--work_dir /path/to/work/dir> \
     <--version VERSION> \
     [--release_grid_editor_plugin] \
-    <--dhydro_suite_version DHYDRO_SUITE_VERSION>
+    <--dhydro_suite_version DHYDRO_SUITE_VERSION> \
     <--start_point {main | master | latest | tag | branch | commit}> \
     <--github_access_token GITHUB_ACCESS_TOKEN> \
     [--upload_to_pypi] \

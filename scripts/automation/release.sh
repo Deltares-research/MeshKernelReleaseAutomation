@@ -789,7 +789,7 @@ function pin_and_tag_artifacts_MeshKernelPy() {
 
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
-        --artifact_name meshkernel-${version}-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl \
+        --artifact_name meshkernel-${version}-py3-none-manylinux_2_28_x86_64.whl \
         --build_config_id GridEditor_MeshKernelPy${forked_repo_suffix}_Linux_BuildPythonWheel \
         --tag ${tag} \
         --teamcity_access_token ${teamcity_access_token}
@@ -889,7 +889,7 @@ function download_python_wheels() {
     local -A teamcity_build_configs
     teamcity_build_configs=(
         ["Windows"]="win_amd64"
-        ["Linux"]="manylinux_2_17_x86_64.manylinux2014_x86_64"
+        ["Linux"]="manylinux_2_28_x86_64"
     )
     for platform in "${!teamcity_build_configs[@]}"; do
         local arch=${teamcity_build_configs[${platform}]}
