@@ -25,6 +25,12 @@ def parse_args():
     )
 
     parser.add_argument(
+        "--last_successful_build",
+        action="store_true",
+        help="Switch for getting the number of the last successful build, whether the build is tagged or not.",
+    )
+
+    parser.add_argument(
         "--teamcity_access_token",
         type=argparse.FileType("r"),
         required=True,
@@ -39,11 +45,14 @@ def parse_args():
 def get_build_counter(
     build_config_id: str,
     version: str,
+    last_successful_build: bool,
     teamcity_access_token: str,
 ):
     tag = f"v{version}"
     branch_name = f"release/{tag}"
-    url = f"{BUILDS_ROOT}?locator=buildType:{build_config_id},branch:{branch_name},tag:{tag}"
+    url = f"{BUILDS_ROOT}?locator=buildType:{build_config_id},branch:{branch_name}"
+    if not last_successful_build:
+        url = f"{url},tag:{tag}"
     requests = RequestWrapper(teamcity_access_token)
     response = requests.get(url)
     builds = response.json()["build"]
@@ -63,6 +72,7 @@ if __name__ == "__main__":
         build_counter = get_build_counter(
             args.build_config_id,
             args.version,
+            args.last_successful_build,
             args.teamcity_access_token.read(),
         )
         if build_counter:

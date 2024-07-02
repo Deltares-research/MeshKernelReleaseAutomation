@@ -40,6 +40,26 @@ class RequestWrapper:
         response.raise_for_status()
         return response
 
+    def get_with_params(self, url: str, params: dict) -> requests.Response:
+        """
+        requests.get wrapper (sends a get request with parameters).
+
+        Args:
+            url (str):  The url to request.
+            params (dict): list of tuples or bytes to send in the query string for the request.
+
+        Returns:
+            int: The response.
+        """
+        response = requests.get(
+            url=url,
+            params=params,
+            stream=True,
+            headers=self.headers,
+        )
+        response.raise_for_status()
+        return response
+
     def delete(self, url: str) -> requests.Response:
         """
         requests.delete wrapper (sends a delete request).
@@ -60,6 +80,7 @@ class RequestWrapper:
 
         Args:
             url (str):  The url to request.
+            json (dict):  A JSON serializable Python object to send in the body of the request.
 
         Returns:
             int: The response.
