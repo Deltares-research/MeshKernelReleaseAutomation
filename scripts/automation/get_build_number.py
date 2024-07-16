@@ -1,7 +1,7 @@
 import argparse
 import sys
 
-from request_wrapper import BUILDS_ROOT, RequestWrapper
+from request_wrapper import BUILDS_ROOT, RequestsWrapper
 
 
 def parse_args():
@@ -53,8 +53,9 @@ def get_build_counter(
     url = f"{BUILDS_ROOT}?locator=buildType:{build_config_id},branch:{branch_name}"
     if not last_successful_build:
         url = f"{url},tag:{tag}"
-    requests = RequestWrapper(teamcity_access_token)
-    response = requests.get(url)
+    request = RequestsWrapper(teamcity_access_token)
+    headers = {"Accept": "application/json"}
+    response = request.get(url, headers=headers)
     builds = response.json()["build"]
     if builds:
         build_counter = builds[0]["number"]
