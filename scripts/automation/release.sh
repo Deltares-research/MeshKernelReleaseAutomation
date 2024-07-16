@@ -4,11 +4,11 @@ set -e
 
 repo_host="github.com"
 
-repo_owner="Deltares"
-forked_repo_suffix=""
+#repo_owner="Deltares"
+#forked_repo_suffix=""
 
-#repo_owner="Deltares-research"
-#forked_repo_suffix="Test"
+repo_owner="Deltares-research"
+forked_repo_suffix="Test"
 
 repo_name_MeshKernel="MeshKernel"${forked_repo_suffix}
 repo_name_MeshKernelPy="MeshKernelPy"${forked_repo_suffix}
@@ -763,6 +763,7 @@ function pin_and_tag_artifacts_MeshKernel() {
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
+    echo "Build number is ${meshkernel_build_number}"
     # pin the MeshKernel nupkg
     python $(get_scripts_path)/pin_artifact.py \
         --branch_name ${release_branch} \
@@ -1100,6 +1101,37 @@ function remove_conda_env() {
     fi
 }
 
+automatic_update_teamcity_config_ids=(
+    "GridEditor_MeshKernelNet${forked_repo_suffix}_HelperConfigurations_AutomaticNugetPackageUpdates_UpdateDhydroSharedConfigurationNuGetPackage"
+    "GridEditor_MeshKernelNet${forked_repo_suffix}_HelperConfigurations_AutomaticNugetPackageUpdates_UpdateMeshKernelNuGetPackage"
+    "GridEditor_GridEditorPlugin${forked_repo_suffix}_HelperConfigurations_AutomaticNugetPackageUpdates_UpdateDeltaresNetNuGetPackages"
+    "GridEditor_GridEditorPlugin${forked_repo_suffix}_HelperConfigurations_AutomaticNugetPackageUpdates_UpdateDeltaShellFrameworkNuGetPackages"
+    "GridEditor_GridEditorPlugin${forked_repo_suffix}_HelperConfigurations_AutomaticNugetPackageUpdates_UpdateDhydroSharedConfigurationNuGetPackage"
+    "GridEditor_GridEditorPlugin${forked_repo_suffix}_HelperConfigurations_AutomaticNugetPackageUpdates_UpdateMeshKernelNETNuGetPackage"
+)
+
+function pause_automatic_teamcity_updates() {
+    show_progress
+    for config_id in "${automatic_update_teamcity_config_ids[@]}"; do
+        python $(get_scripts_path)/pause_teamcity_build_config.py \
+            --build_config_id "${config_id}" \
+            --pause \
+            --teamcity_access_token ${teamcity_access_token}
+
+    done
+}
+
+function resume_automatic_teamcity_updates() {
+    show_progress
+    for config_id in "${automatic_update_teamcity_config_ids[@]}"; do
+        python $(get_scripts_path)/pause_teamcity_build_config.py \
+            --build_config_id "${config_id}" \
+            --resume \
+            --teamcity_access_token ${teamcity_access_token}
+
+    done
+}
+
 function main() {
 
     local start_time=$(date +%s)
@@ -1120,12 +1152,16 @@ function main() {
 
     create_conda_env
 
+    pause_automatic_teamcity_updates
+
     release "MeshKernel" ${repo_name_MeshKernel}
     release "MeshKernelPy" ${repo_name_MeshKernelPy}
     release "MeshKernelNET" ${repo_name_MeshKernelNET}
     if ${release_grid_editor_plugin}; then
         release "GridEditorPlugin" ${repo_name_GridEditorPlugin}
     fi
+
+    resume_automatic_teamcity_updates
 
     # pin_and_tag_artifacts_MeshKernel ${release_branch} ${version} ${tag} ${teamcity_access_token}
     # pin_and_tag_artifacts_MeshKernelPy ${release_branch} ${version} ${tag} ${teamcity_access_token}
