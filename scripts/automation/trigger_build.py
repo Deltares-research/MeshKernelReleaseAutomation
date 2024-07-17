@@ -2,7 +2,9 @@ import argparse
 import sys
 import time
 
-from request_wrapper import BUILDS_QUEUE_ROOT, BUILDS_ROOT, RequestWrapper
+from request_wrapper import BUILDS_QUEUE_ROOT, BUILDS_ROOT, RequestsWrapper
+
+HEADERS = {"Accept": "application/json"}
 
 
 def parse_arguments():
@@ -45,7 +47,7 @@ def parse_arguments():
 def trigger_build(
     branch_name: str,
     build_config_id: str,
-    request: RequestWrapper,
+    request: RequestsWrapper,
 ) -> int:
 
     # setup payload for triggering the build
@@ -55,7 +57,7 @@ def trigger_build(
     }
 
     # trigger the build
-    response = request.post(BUILDS_QUEUE_ROOT, build_trigger_json)
+    response = request.post(BUILDS_QUEUE_ROOT, headers=HEADERS, json=build_trigger_json)
 
     # Check if the build was successfully triggered
     if response.status_code == 200:
@@ -70,7 +72,7 @@ def trigger_build(
 def wait_for_build(
     build_id: int,
     refresh_interval: int,
-    request: RequestWrapper,
+    request: RequestsWrapper,
 ) -> bool:
 
     # construct the url for checking the build state and status
@@ -79,7 +81,7 @@ def wait_for_build(
     # Poll for the build state until it's finished then check if it was successful
     print(f"Waiting for build with id {build_id}...")
     while True:
-        response = request.get(build_url)
+        response = request.get(build_url, headers=HEADERS)
         json_content = response.json()
         # Check if the build is finished
         if json_content["state"] == "finished":
@@ -101,7 +103,7 @@ def get_dependent_builds(build_id, request):
     url = f"{BUILDS_ROOT}?locator=snapshotDependency:(from:(id:{build_id}))"
 
     # Make an HTTP GET request to retrieve dependent builds
-    response = request.get(url)
+    response = request.get(url, headers=HEADERS)
 
     # Check if the request was successful
     if response.status_code == 200:
@@ -160,7 +162,7 @@ def run(
         teamcity_access_token : str
             The TeamCity access token to authenticate with.
     """
-    request = RequestWrapper(teamcity_access_token)
+    request = RequestsWrapper(teamcity_access_token)
 
     trigger_build_id = trigger_build(
         branch_name,

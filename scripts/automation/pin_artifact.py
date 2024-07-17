@@ -7,11 +7,13 @@ import argparse
 import logging
 from typing import Dict, Optional, Sequence
 
-from request_wrapper import BUILDS_ROOT, RequestWrapper
+from request_wrapper import BUILDS_ROOT, RequestsWrapper
+
+HEADERS = {"Accept": "application/json"}
 
 
 def get_previous_build(
-    branch_name: str, build_config_id: str, tag: str, request: RequestWrapper
+    branch_name: str, build_config_id: str, tag: str, request: RequestsWrapper
 ) -> Optional[Dict]:
     """
     Get the previous build tagged with the specified tag
@@ -21,13 +23,12 @@ def get_previous_build(
             The build configuration id of the build to be retrieved.
         tag : str
             The tag with which the build should be retrieved.
-        request : RequestWrapper
+        request : RequestsWrapper
             The request wrapper to make requests calls.
     """
 
     build_url = f"{BUILDS_ROOT}?locator=branch:{branch_name},buildType:{build_config_id},tag:{tag},pinned:true,count:1"
-
-    response = request.get(build_url)
+    response = request.get(build_url, headers=HEADERS)
 
     if response.status_code != 200:
         return None
@@ -37,28 +38,28 @@ def get_previous_build(
 
     build_id = response.json()["build"][0]["id"]
     build_url_by_id = f"{BUILDS_ROOT}/id:{build_id}"
-    response_by_id = request.get(build_url_by_id)
+    response_by_id = request.get(build_url_by_id, headers=HEADERS)
     if response.status_code != 200:
         return None
 
     return response_by_id.json()
 
 
-def unpin_build(build_id: str, request: RequestWrapper) -> None:
+def unpin_build(build_id: str, request: RequestsWrapper) -> None:
     """
     Unpin the build with build_id.
 
     Args:
         build_id : str
             The id of the build to be unpinned.
-        request : RequestWrapper
+        request : RequestsWrapper
             The request wrapper to make requests calls.
     """
     pin_url = f"{BUILDS_ROOT}/id:{build_id}/pin/"
-    request.delete(pin_url)
+    request.delete(pin_url, headers=HEADERS)
 
 
-def clean_build(build_info: dict, tag: str, request: RequestWrapper) -> None:
+def clean_build(build_info: dict, tag: str, request: RequestsWrapper) -> None:
     """
     Remove the specified tag from the specified build and unpin if necessary.
 
@@ -67,7 +68,7 @@ def clean_build(build_info: dict, tag: str, request: RequestWrapper) -> None:
             A dictionary describing the build to be modified.
         tag : str
             The tag to be removed from the build
-        request : RequestWrapper
+        request : RequestsWrapper
             The request wrapper to make requests calls.
     """
 
@@ -89,7 +90,7 @@ def get_tag_values(tags) -> Sequence[str]:
     return list(x["name"] for x in tags["tag"])
 
 
-def untag_build(build_info: dict, tag: str, request: RequestWrapper) -> None:
+def untag_build(build_info: dict, tag: str, request: RequestsWrapper) -> None:
     """
     Remove the specified tag from the build specified with build_info.
 
@@ -98,7 +99,7 @@ def untag_build(build_info: dict, tag: str, request: RequestWrapper) -> None:
             A dictionary describing the build to be modified.
         tag : str
             The tag to be removed from the build
-        request : RequestWrapper
+        request : RequestsWrapper
             The request wrapper to make requests calls.
     """
     build_tags = get_tag_values(build_info["tags"])
@@ -109,14 +110,14 @@ def untag_build(build_info: dict, tag: str, request: RequestWrapper) -> None:
     new_tags = {"count": len(new_tag_values), "tag": new_tag_values}
 
     tag_url = f"{BUILDS_ROOT}/id:{build_info['id']}/tags/"
-    request.put_json(tag_url, new_tags)
+    request.put(tag_url, headers=HEADERS, json=new_tags)
 
 
 def has_artifact(
     build_url: str,
     artifact_path: str,
     artifact_name: str,
-    request: RequestWrapper,
+    request: RequestsWrapper,
 ) -> bool:
     """
     Returns whether or not the specified build has the valid artifact
@@ -126,13 +127,13 @@ def has_artifact(
             The build url to check the artifacts for.
         artifact_name : str
             The expected artifact file name within the build to be retrieved.
-        request : RequestWrapper
+        request : RequestsWrapper
             The request wrapper to make requests calls.
     """
     build_artifacts_url = f"{build_url}/artifacts/"
     if artifact_path:
         build_artifacts_url = f"{build_artifacts_url}/{artifact_path}"
-    artifacts_response = request.get(build_artifacts_url)
+    artifacts_response = request.get(build_artifacts_url, headers=HEADERS)
 
     if artifacts_response.status_code != 200:
         return False
@@ -145,7 +146,7 @@ def get_new_build(
     build_config_id: str,
     artifact_path: str,
     artifact_name: str,
-    request: RequestWrapper,
+    request: RequestsWrapper,
 ) -> Optional[Dict]:
     """
     Get the build from build_config with the specified artifact.
@@ -155,14 +156,14 @@ def get_new_build(
             The id of the build configuration of which the build is part.
         artifact_name : str
             The expected artifact file name within the build to be retrieved.
-        request : RequestWrapper
+        request : RequestsWrapper
             The request wrapper to make requests calls.
     """
     builds_url = (
         f"{BUILDS_ROOT}?locator=branch:{branch_name},buildType:{build_config_id}"
     )
 
-    new_builds_response = request.get(builds_url)
+    new_builds_response = request.get(builds_url, headers=HEADERS)
 
     if new_builds_response.status_code != 200:
         return None
@@ -175,7 +176,7 @@ def get_new_build(
         if not has_artifact(new_build_url, artifact_path, artifact_name, request):
             continue
 
-        new_build_info = request.get(new_build_url)
+        new_build_info = request.get(new_build_url, headers=HEADERS)
 
         if new_build_info.status_code != 200:
             logging.warning(
@@ -188,21 +189,21 @@ def get_new_build(
     return None
 
 
-def pin_build(build_id: str, request: RequestWrapper) -> None:
+def pin_build(build_id: str, request: RequestsWrapper) -> None:
     """
     Pin the build with build_id.
 
     Args:
         build_id : str
             The id of the build to be pinned.
-        request : RequestWrapper
+        request : RequestsWrapper
             The request wrapper to make requests calls.
     """
     pin_url = f"{BUILDS_ROOT}/id:{build_id}/pin/"
-    request.put(pin_url)
+    request.put(pin_url, headers=HEADERS)
 
 
-def tag_build(build_info, tag: str, request: RequestWrapper) -> None:
+def tag_build(build_info, tag: str, request: RequestsWrapper) -> None:
     """
     Add a tag with value tag to the build specified with build_info.
 
@@ -211,7 +212,7 @@ def tag_build(build_info, tag: str, request: RequestWrapper) -> None:
             A dictionary describing the build to be modified.
         tag : str
             The new tag to be added to the build
-        request : RequestWrapper
+        request : RequestsWrapper
             The request wrapper to make requests calls.
     """
     if "tags" in build_info:
@@ -226,10 +227,10 @@ def tag_build(build_info, tag: str, request: RequestWrapper) -> None:
     new_tags = {"count": len(new_tag_values), "tag": new_tag_values}
 
     tag_url = f"{BUILDS_ROOT}/id:{build_info['id']}/tags/"
-    request.put_json(tag_url, new_tags)
+    request.put(tag_url, headers=HEADERS, json=new_tags)
 
 
-def bag_build(build_info: dict, tag: str, request: RequestWrapper) -> None:
+def bag_build(build_info: dict, tag: str, request: RequestsWrapper) -> None:
     """
     Pin and tag the build specified with build_info.
 
@@ -238,7 +239,7 @@ def bag_build(build_info: dict, tag: str, request: RequestWrapper) -> None:
             A dictionary describing the build to be modified.
         tag : str
             The new tag to be added to the build
-        request : RequestWrapper
+        request : RequestsWrapper
             The request wrapper to make requests calls.
     """
     pin_build(build_info["id"], request)
@@ -251,7 +252,7 @@ def pin_artifact(
     tag: str,
     artifact_path: str,
     artifact_name: str,
-    request: RequestWrapper,
+    request: RequestsWrapper,
 ):
     """
     Pin and tag the build specified with build_info.
@@ -263,7 +264,7 @@ def pin_artifact(
             The id of the build configuration on TeamCity that publishes the specified artifact.
         tag : str
             The new tag to be added to the build
-        request : RequestWrapper
+        request : RequestsWrapper
             The request wrapper to make requests calls.
     """
 
@@ -371,7 +372,7 @@ def run(
             The path of the artifact to pin and tag.
     """
 
-    request = RequestWrapper(teamcity_access_token)
+    request = RequestsWrapper(teamcity_access_token)
     pin_artifact(
         branch_name,
         build_config_id,

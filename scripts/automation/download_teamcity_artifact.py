@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 
-from request_wrapper import BUILDS_ROOT, DOWNLOADS_ROOT, RequestWrapper
+from request_wrapper import BUILDS_ROOT, DOWNLOADS_ROOT, RequestsWrapper
 
 
 def parse_arguments():
@@ -72,7 +72,7 @@ def download_teamcity_artifact(
     build_config_id: str,
     tag: str,
     destination: Path,
-    request: RequestWrapper,
+    request: RequestsWrapper,
     artifact_path: str = "",
 ):
     # Get the build ID
@@ -80,10 +80,9 @@ def download_teamcity_artifact(
         "locator": f"branch:{branch_name},buildType:{build_config_id},tags:{tag},count:1"
     }
 
-    response = request.get_with_params(
-        url=BUILDS_ROOT,
-        params=params,
-    )
+    headers = {"Accept": "application/json"}
+
+    response = request.get(BUILDS_ROOT, params=params, headers=headers)
 
     if response.status_code != 200:
         raise Exception(f"Failed to get build ID: {response.text}")
@@ -98,7 +97,7 @@ def download_teamcity_artifact(
         artifact_url = f"{artifact_url}/{artifact_path}"
     artifact_url = f"{artifact_url}/{artifact_name}"
 
-    response = request.get(url=artifact_url)
+    response = request.get(artifact_url, headers=headers)
 
     # Write artifact to destination
     path = os.path.join(destination, artifact_name)
@@ -133,7 +132,7 @@ def run(
         teamcity_access_token : str
             The TeamCity access token to authenticate with.
     """
-    request = RequestWrapper(teamcity_access_token)
+    request = RequestsWrapper(teamcity_access_token)
     download_teamcity_artifact(
         branch_name,
         artifact_name,
