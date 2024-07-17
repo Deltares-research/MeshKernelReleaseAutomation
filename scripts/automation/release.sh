@@ -121,67 +121,56 @@ function parse_arguments() {
             ;;
         --work_dir)
             declare -g work_dir="$2"
-            shift # past argument
-            shift # past value
+            shift 2
             ;;
         --version)
             declare -g version="$2"
-            shift # past argument
-            shift # past value
+            shift 2
             ;;
         --release_grid_editor_plugin)
             declare -g release_grid_editor_plugin=true
-            shift # past argument
+            shift
             ;;
         --dhydro_suite_version)
             declare -g dhydro_suite_version="$2"
-            shift # past argument
-            shift # past value
+            shift 2
             ;;
         --start_point)
             declare -g start_point="$2"
-            shift # past argument
-            shift # past value
+            shift 2
             ;;
         --github_access_token)
             declare -g github_access_token="$2"
-            shift # past argument
-            shift # past value
+            shift 2
             ;;
         --github_refresh_interval)
             declare -gi github_refresh_interval="$2"
-            shift # past argument
-            shift # past value
+            shift 2
             ;;
         --upload_to_pypi)
             declare -g upload_to_pypi=true
-            shift # past argument
+            shift
             ;;
         --pypi_access_token)
             declare -g pypi_access_token="$2"
-            shift # past argument
-            shift # past value
+            shift 2
             ;;
         --teamcity_access_token)
             declare -g teamcity_access_token="$2"
-            shift # past argument
-            shift # past value
+            shift 2
             ;;
         --delay)
             declare -gi delay="$2"
-            shift # past argument
-            shift # past value
+            shift 2
             ;;
         --clean)
             declare -g clean=true
-            shift # past argument
+            shift
             ;;
         -* | --*)
             echo "Unknown parameter $1"
-            #usage
-            #exit 1
             do_exit=true
-            shift # past argument
+            shift
             ;;
         *)
             positional_args+=("$1") # save positional arg
@@ -247,13 +236,16 @@ function log_out() {
 
 function create_work_dir() {
     show_progress
+    if [ -d "${work_dir}" ]; then
+        rm -rf "${work_dir}"
+    fi
     mkdir ${work_dir}
 }
 
 function remove_work_dir() {
     show_progress
     if ${clean}; then
-        rm -fr ${work_dir}
+        rm -fr "${work_dir}"
     fi
 }
 
@@ -1085,19 +1077,19 @@ function upload_python_wheels_to_pypi() {
 
 function create_conda_env() {
     show_progress
-    local env_name="release_conda_env"
-    if ! conda env list | grep -q "\<$env_name\>"; then
-        conda env create -f $(get_scripts_path)/${env_name}.yml
+    local conda_env_name="release_conda_env"
+    if ! conda env list | grep -q "\<$conda_env_name\>"; then
+        conda env create -f $(get_scripts_path)/${conda_env_name}.yml
     fi
-    source activate ${env_name}
+    source activate ${conda_env_name}
 }
 
 function remove_conda_env() {
     show_progress
-    local env_name="release_conda_env"
-    if conda env list | grep -q "\<$env_name\>"; then
+    local conda_env_name="release_conda_env"
+    if conda env list | grep -q "\<$conda_env_name\>"; then
         conda deactivate
-        conda remove -y -n ${env_name} --all
+        conda remove -y -n ${conda_env_name} --all
     fi
 }
 
