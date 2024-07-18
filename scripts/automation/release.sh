@@ -2,19 +2,7 @@
 
 set -e
 
-repo_host="github.com"
-
-repo_owner="Deltares"
-forked_repo_suffix=""
-
-#repo_owner="Deltares-research"
-#forked_repo_suffix="Test"
-
-repo_name_MeshKernel="MeshKernel"${forked_repo_suffix}
-repo_name_MeshKernelPy="MeshKernelPy"${forked_repo_suffix}
-repo_name_MeshKernelNET="MeshKernelNET"${forked_repo_suffix}
-repo_name_GridEditorPlugin="Grid_Editor_plugin"${forked_repo_suffix}
-
+source $(dirname $(realpath "$0"))/globals.sh
 source $(dirname $(realpath "$0"))/utilities.sh
 source $(dirname $(realpath "$0"))/catch.sh
 source $(dirname $(realpath "$0"))/usage.sh
@@ -466,7 +454,7 @@ function rerun_all_workflows() {
         gh workflow list \
             --repo ${repo} \
             --json name \
-            --jq '.[].name'
+        --jq '.[].name'
     )
 
     readarray -t workflows <<<"$workflows_list"
@@ -555,7 +543,7 @@ function pin_and_tag_artifacts_MeshKernel() {
     echo "Build number is ${meshkernel_build_number}"
     # pin the MeshKernel nupkg
     python $(get_scripts_path)/pin_artifact.py \
-        --branch_name ${release_branch} \
+    --branch_name ${release_branch} \
         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
         --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_NuGet_MeshKernelSigned \
         --tag ${tag} \
