@@ -900,7 +900,7 @@ function main() {
     local tag=v${version}
     local release_branch=release/${tag}
 
-    create_conda_env $(get_scripts_path)/${conda_env_name}.yml
+    create_conda_env "$(get_scripts_path)/conda_env.yml"
 
     pause_automatic_teamcity_updates
 
