@@ -24,6 +24,7 @@ pypi_access_token=""
 teamcity_access_token=""
 clean=false
 
+source $(dirname $(realpath "$0"))/usage.sh
 source $(dirname $(realpath "$0"))/monitor_checks_on_branch.sh
 
 function col_echo() {
@@ -80,32 +81,6 @@ trap 'catch $?' EXIT
 
 function show_progress() {
     col_echo --blue ">> ${FUNCNAME[1]}"
-}
-
-function usage {
-    echo "Usage: $0 [OPTIONS]"
-    echo "Creates a new release."
-    echo " Options:"
-    echo "  --work_dir                    Required   string   Path to the work directory"
-    echo "  --version                     Required   string   Semantic version of new release"
-    echo "  --release_grid_editor_plugin  Optional   -        If supplied, Grid Editor plugin is released beside"
-    echo "                                                    MeshKernel, MeshKernelPy and MeshKernelNET."
-    echo "  --dhydro_suite_version        Dependent  string   Version of D-HYDRO suite"
-    echo "                                                    Required if --release_grid_editor_plugin is provided, ignored otherwise"
-    echo "  --start_point                 Required   string   ID of commit, branch or tag to check out"
-    echo "                                                    If a branch is specified, the HEAD of the branch is checked out"
-    echo "  --github_access_token         Required   string   Path to github access token"
-    echo "  --upload_to_pypi              Optional            If supplied, the python wheels are uploaded to PyPi"
-    echo "  --pypi_access_token           Dependent  string   Path to PyPi access token"
-    echo "                                                    Required if --upload_to_pypi is provided, ignored otherwise"
-    echo "  --teamcity_access_token       Required   string   Path to teamcity access token"
-    echo "  --github_refresh_interval     Optional   integer  Refresh interval in seconds."
-    echo "                                                    Used as a refresh interval while watching github PR checks (default = 30s)"
-    echo "  --delay                       Optional   integer  Delay in seconds"
-    echo "                                                    The script sleeps for this duration before watching github PR checks (default = 30s)"
-    echo "  --clean                       Optional   -        If supplied, the work directory is removed upon completion"
-    echo "  --help                                            Display this help and exit"
-    echo ""
 }
 
 # Define the parse_named_arguments function
