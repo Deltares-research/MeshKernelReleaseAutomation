@@ -480,23 +480,13 @@ function rerun_all_workflows() {
     done
 }
 
-function print_box() {
-    local string="$1"
-    local length=${#string}
-    local border="+-$(printf "%${length}s" | tr ' ' '-')-+"
-
-    col_echo --green "$border"
-    col_echo --green "| $string |"
-    col_echo --green "$border"
-}
-
 function release() {
     show_progress
 
     local product=$1
     local repo_name=$2
 
-    print_box "${repo_name} Release v${version}"
+    print_text_box "${repo_name} Release v${version}"
 
     local tag=v${version}
 
@@ -901,7 +891,7 @@ function main() {
     check_time_value "github_refresh_interval" ${github_refresh_interval}
     check_time_value "delay" ${delay}
 
-    print_box "Release v${version}"
+    print_text_box "Release v${version}"
 
     log_in
 
@@ -942,7 +932,7 @@ function main() {
 
     local end_time=$(date +%s)
     local elapsed_time=$((end_time - start_time))
-    print_box "Release v${version} took $(date -u -d "@$elapsed_time" +%H:%M:%S)"
+    print_text_box "Release v${version} took $(date -u -d "@$elapsed_time" +%H:%M:%S)"
 }
 
 main "$@"
