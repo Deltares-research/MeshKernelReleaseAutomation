@@ -7,6 +7,7 @@ source $(dirname $(realpath "$0"))/utilities.sh
 source $(dirname $(realpath "$0"))/catch.sh
 source $(dirname $(realpath "$0"))/usage.sh
 source $(dirname $(realpath "$0"))/parse_arguments.sh
+source $(dirname $(realpath "$0"))/conda_env.sh
 source $(dirname $(realpath "$0"))/monitor_checks_on_branch.sh
 
 function log_in() {
@@ -454,7 +455,7 @@ function rerun_all_workflows() {
         gh workflow list \
             --repo ${repo} \
             --json name \
-        --jq '.[].name'
+            --jq '.[].name'
     )
 
     readarray -t workflows <<<"$workflows_list"
@@ -543,7 +544,7 @@ function pin_and_tag_artifacts_MeshKernel() {
     echo "Build number is ${meshkernel_build_number}"
     # pin the MeshKernel nupkg
     python $(get_scripts_path)/pin_artifact.py \
-    --branch_name ${release_branch} \
+        --branch_name ${release_branch} \
         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
         --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_NuGet_MeshKernelSigned \
         --tag ${tag} \
@@ -860,24 +861,6 @@ function upload_python_wheels_to_pypi() {
         ${work_dir}/artifacts/python_wheels/*.whl
 }
 
-function create_conda_env() {
-    show_progress
-    local conda_env_name="release_conda_env"
-    if ! conda env list | grep -q "\<$conda_env_name\>"; then
-        conda env create -f $(get_scripts_path)/${conda_env_name}.yml
-    fi
-    source activate ${conda_env_name}
-}
-
-function remove_conda_env() {
-    show_progress
-    local conda_env_name="release_conda_env"
-    if conda env list | grep -q "\<$conda_env_name\>"; then
-        conda deactivate
-        conda remove -y -n ${conda_env_name} --all
-    fi
-}
-
 automatic_update_teamcity_config_ids=(
     "GridEditor_MeshKernelNet${forked_repo_suffix}_HelperConfigurations_AutomaticNugetPackageUpdates_UpdateDhydroSharedConfigurationNuGetPackage"
     "GridEditor_MeshKernelNet${forked_repo_suffix}_HelperConfigurations_AutomaticNugetPackageUpdates_UpdateMeshKernelNuGetPackage"
@@ -927,7 +910,7 @@ function main() {
     local tag=v${version}
     local release_branch=release/${tag}
 
-    create_conda_env
+    create_conda_env $(get_scripts_path)/${conda_env_name}.yml
 
     pause_automatic_teamcity_updates
 
