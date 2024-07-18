@@ -43,7 +43,7 @@ function show_progress() {
     col_echo --blue ">> ${FUNCNAME[1]}"
 }
 
-function print_tex_box() {
+function print_text_box() {
     local string="$1"
     local length=${#string}
     local border="+-$(printf "%${length}s" | tr ' ' '-')-+"
