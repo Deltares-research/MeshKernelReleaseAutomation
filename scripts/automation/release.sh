@@ -25,8 +25,7 @@ teamcity_access_token=""
 clean=false
 
 source $(dirname $(realpath "$0"))/utilities.sh
-trap 'catch $?' EXIT
-
+source $(dirname $(realpath "$0"))/catch.sh
 source $(dirname $(realpath "$0"))/usage.sh
 source $(dirname $(realpath "$0"))/monitor_checks_on_branch.sh
 
