@@ -2,18 +2,20 @@
 
 set -e
 
-source $(dirname $(realpath "$0"))/globals.sh
-source $(dirname $(realpath "$0"))/utilities.sh
-source $(dirname $(realpath "$0"))/catch.sh
-source $(dirname $(realpath "$0"))/usage.sh
-source $(dirname $(realpath "$0"))/parse_arguments.sh
-source $(dirname $(realpath "$0"))/conda_env.sh
-source $(dirname $(realpath "$0"))/monitor_checks_on_branch.sh
-source $(dirname $(realpath "$0"))/pause_teamcity_auto_updates.sh
-source $(dirname $(realpath "$0"))/update_repositories.sh
-source $(dirname $(realpath "$0"))/pin_and_tag_artifacts.sh
-source $(dirname $(realpath "$0"))/download_artifacts.sh
-source $(dirname $(realpath "$0"))/upload_artifacts.sh
+declare -g scripts_path=$(dirname $(realpath "$0"))
+
+source ${scripts_path}/globals.sh
+source ${scripts_path}/utilities.sh
+source ${scripts_path}/catch.sh
+source ${scripts_path}/usage.sh
+source ${scripts_path}/parse_arguments.sh
+source ${scripts_path}/conda_env.sh
+source ${scripts_path}/monitor_checks_on_branch.sh
+source ${scripts_path}/pause_teamcity_auto_updates.sh
+source ${scripts_path}/update_repositories.sh
+source ${scripts_path}/pin_and_tag_artifacts.sh
+source ${scripts_path}/download_artifacts.sh
+source ${scripts_path}/upload_artifacts.sh
 
 function log_in() {
     show_progress
@@ -38,10 +40,6 @@ function remove_work_dir() {
     if ${clean}; then
         rm -fr "${work_dir}"
     fi
-}
-
-function get_scripts_path() {
-    echo $(dirname $(realpath "$0"))
 }
 
 function get_gh_repo_path() {
@@ -430,7 +428,7 @@ function main() {
     local tag=v${version}
     local release_branch=release/${tag}
 
-    create_conda_env "$(get_scripts_path)/conda_env.yml"
+    create_conda_env ${scripts_path}/conda_env.yml
 
     pause_automatic_teamcity_updates
 

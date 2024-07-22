@@ -12,7 +12,7 @@ automatic_update_teamcity_config_ids=(
 function pause_automatic_teamcity_updates() {
     show_progress
     for config_id in "${automatic_update_teamcity_config_ids[@]}"; do
-        python $(get_scripts_path)/pause_teamcity_build_config.py \
+        python ${scripts_path}/pause_teamcity_build_config.py \
             --build_config_id "${config_id}" \
             --pause \
             --teamcity_access_token ${teamcity_access_token}
@@ -23,7 +23,7 @@ function pause_automatic_teamcity_updates() {
 function resume_automatic_teamcity_updates() {
     show_progress
     for config_id in "${automatic_update_teamcity_config_ids[@]}"; do
-        python $(get_scripts_path)/pause_teamcity_build_config.py \
+        python ${scripts_path}/pause_teamcity_build_config.py \
             --build_config_id "${config_id}" \
             --resume \
             --teamcity_access_token ${teamcity_access_token}

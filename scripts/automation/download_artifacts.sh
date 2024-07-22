@@ -19,7 +19,7 @@ function download_python_wheels() {
     )
     for platform in "${!teamcity_build_configs[@]}"; do
         local arch=${teamcity_build_configs[${platform}]}
-        python $(get_scripts_path)/download_teamcity_artifact.py \
+        python ${scripts_path}/download_teamcity_artifact.py \
             --branch_name ${release_branch} \
             --artifact_name meshkernel-${version}-py3-none-${arch}.whl \
             --build_config_id GridEditor_MeshKernelPy${forked_repo_suffix}_${platform}_BuildPythonWheel \
@@ -65,12 +65,12 @@ function download_nuget_packages() {
 
     # MeshKernel
     local meshkernel_build_number=$(
-        python $(get_scripts_path)/get_build_number.py \
+        python ${scripts_path}/get_build_number.py \
             --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
-    python $(get_scripts_path)/download_teamcity_artifact.py \
+    python ${scripts_path}/download_teamcity_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name Deltares.MeshKernel.${version}.${meshkernel_build_number}.nupkg \
         --build_config_id GridEditor_MeshKernel${forked_repo_suffix}_Windows_NuGet_MeshKernelSigned \
@@ -80,12 +80,12 @@ function download_nuget_packages() {
 
     # MeshKernelNET
     local meshkernelnet_build_number=$(
-        python $(get_scripts_path)/get_build_number.py \
+        python ${scripts_path}/get_build_number.py \
             --build_config_id GridEditor_MeshKernelNet${forked_repo_suffix}_Build \
             --version ${version} \
             --teamcity_access_token ${teamcity_access_token}
     )
-    python $(get_scripts_path)/download_teamcity_artifact.py \
+    python ${scripts_path}/download_teamcity_artifact.py \
         --branch_name ${release_branch} \
         --artifact_name MeshKernelNET.${version}.${meshkernelnet_build_number}.nupkg \
         --build_config_id GridEditor_MeshKernelNet${forked_repo_suffix}_NuGet_MeshKernelNETSigned \
@@ -96,12 +96,12 @@ function download_nuget_packages() {
     # GridEditorPlugin
     if ${release_grid_editor_plugin}; then
         local grideditorplugin_build_number=$(
-            python $(get_scripts_path)/get_build_number.py \
+            python ${scripts_path}/get_build_number.py \
                 --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Build \
                 --version ${version} \
                 --teamcity_access_token ${teamcity_access_token}
         )
-        python $(get_scripts_path)/download_teamcity_artifact.py \
+        python ${scripts_path}/download_teamcity_artifact.py \
             --branch_name ${release_branch} \
             --artifact_name DeltaShell.Plugins.GridEditor.${version}.${grideditorplugin_build_number}.nupkg \
             --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_NuGetPackageSigned \
@@ -126,7 +126,7 @@ function download_msi() {
     if ${release_grid_editor_plugin}; then
         local build_config_id="GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_StandAloneInstaller"
         local grideditorplugin_build_number=$(
-            python $(get_scripts_path)/get_build_number.py \
+            python ${scripts_path}/get_build_number.py \
                 --build_config_id ${build_config_id} \
                 --version ${version} \
                 --teamcity_access_token ${teamcity_access_token}
@@ -134,7 +134,7 @@ function download_msi() {
 
         local msi_file_name="GridEditor ${dhydro_suite_version} Stand-alone (${grideditorplugin_build_number}).msi"
 
-        python $(get_scripts_path)/download_teamcity_artifact.py \
+        python ${scripts_path}/download_teamcity_artifact.py \
             --branch_name ${release_branch} \
             --artifact_path "setup/GridEditor/bin/Release/stand-alone" \
             --artifact_name "${msi_file_name}" \
