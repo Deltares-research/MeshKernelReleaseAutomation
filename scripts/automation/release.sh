@@ -9,6 +9,7 @@ source $(dirname $(realpath "$0"))/usage.sh
 source $(dirname $(realpath "$0"))/parse_arguments.sh
 source $(dirname $(realpath "$0"))/conda_env.sh
 source $(dirname $(realpath "$0"))/monitor_checks_on_branch.sh
+source $(dirname $(realpath "$0"))/pin_and_tag_artifacts.sh
 source $(dirname $(realpath "$0"))/download_artifacts.sh
 source $(dirname $(realpath "$0"))/upload_artifacts.sh
 
