@@ -9,6 +9,7 @@ source ${scripts_path}/utilities.sh
 source ${scripts_path}/catch.sh
 source ${scripts_path}/usage.sh
 source ${scripts_path}/parse_arguments.sh
+source ${scripts_path}/work_dir.sh
 source ${scripts_path}/conda_env.sh
 source ${scripts_path}/monitor_checks_on_branch.sh
 source ${scripts_path}/pause_teamcity_auto_updates.sh
@@ -27,29 +28,9 @@ function log_out() {
     gh auth logout
 }
 
-function create_work_dir() {
-    show_progress
-    if [ -d "${work_dir}" ]; then
-        rm -rf "${work_dir}"
-    fi
-    mkdir ${work_dir}
-}
-
-function remove_work_dir() {
-    show_progress
-    if ${clean}; then
-        rm -fr "${work_dir}"
-    fi
-}
-
 function get_gh_repo_path() {
     local repo_name=$1
     echo ${repo_host}/${repo_owner}/${repo_name}
-}
-
-function get_local_repo_path() {
-    local repo_name=$1
-    echo ${work_dir}/${repo_name}
 }
 
 function clone() {
