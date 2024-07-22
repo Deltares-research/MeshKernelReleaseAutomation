@@ -124,3 +124,27 @@ function parse_arguments() {
         exit 1
     fi
 }
+
+function check_version_string() {
+    local version=$1
+    local pattern="^[0-9]+\.[0-9]+\.[0-9]+$"
+    if ! [[ $version =~ $pattern ]]; then
+        echo "The string \"$version\" does not correspond to a semantic version of the form <major>.<minor>.<patch>."
+        exit 1
+    fi
+}
+
+function check_time_value() {
+    local name=$1
+    local value=$2
+    if [[ $2 -le 0 ]]; then
+        echo "$1 must be a positive integer."
+        exit 1
+    fi
+}
+
+function check_arguments() {
+    check_version_string ${version}
+    check_time_value "github_refresh_interval" ${github_refresh_interval}
+    check_time_value "delay" ${delay}
+}
