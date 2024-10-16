@@ -43,8 +43,12 @@ function release() {
         monitor_pull_request_checks ${repo_name} ${release_branch}
         create_release ${repo_name} ${release_branch} ${tag}
         pin_and_tag_artifacts_${product} ${release_branch} ${version} ${tag} ${teamcity_access_token}
-        merge_release_tag_into_base_branch ${repo_name} ${tag}
-        monitor_checks_on_base_branch ${repo_name}
+        if ${auto_merge}; then
+            merge_release_tag_into_base_branch ${repo_name} ${tag}
+            monitor_checks_on_base_branch ${repo_name}
+        else
+            col_echo --green "Warning: auto-merge is disabled. You must merge the release tag or cherry-pick all new commits (including automatic commits) manually to the default branch."
+        fi
     fi
 }
 
