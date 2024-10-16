@@ -98,15 +98,25 @@ function create_release_branch() {
     local release_branch=$2
     local start_point=$3
     local repo_path=$(get_local_repo_path ${repo_name})
-    # pull remote
-    git -C ${repo_path} pull origin ${start_point}
-    git -C ${repo_path} status
-    # switch to release branch
-    git -C ${repo_path} checkout -B ${release_branch} ${start_point}
-    git -C ${repo_path} status
-    # and immediately push it to remote
-    git -C ${repo_path} push -f origin ${release_branch}
-    git -C ${repo_path} status
+
+    local remote_ref=$(git -C ${repo_path} ls-remote --heads origin "${release_branch}")
+    if [[ -n "${remote_ref}" ]]; then
+        echo "Remote branch exists ${release_branch} exists."
+        echo "Found "${remote_ref}""
+    else
+        # pull remote
+        git -C ${repo_path} pull origin ${start_point}
+        git -C ${repo_path} status
+        # switch to release branch
+        git -C ${repo_path} checkout -B ${release_branch} ${start_point}
+        git -C ${repo_path} status
+        # and push it to remote
+        # not sure if force pushing is necessary because of the if statement
+        # pitfall: what if we're restating a release that does not expect remote to exist?
+        # solution: delete remote manually before restarting
+        git -C ${repo_path} push -f origin ${release_branch}
+        git -C ${repo_path} status
+    fi
 }
 
 function get_default_branch_name() {
