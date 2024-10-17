@@ -33,12 +33,8 @@ function check_start_point() {
         [ "$start_point" == "master" ] ||
         [ "$start_point" == "latest" ]; then # auto-detects default branch name when there's a mess of mains and masters
         start_point=$(get_default_branch_name ${repo_name})
-    elif (git -C ${repo_path} show-ref --tags --verify --quiet -- refs/tags/${start_point} >/dev/null 2>&1); then
-        echo Starting point is ${start_point}, which is a tag.
-    elif (git -C ${repo_path} show-ref --verify --quiet -- refs/heads/${start_point} >/dev/null 2>&1); then
-        echo Starting point is ${start_point}, which is a branch.
-    elif (git -C ${repo_path} rev-parse --verify ${start_point}^{commit} >/dev/null 2>&1); then
-        echo Starting point is ${start_point}, which is a commit.
+    elif [[ -n $(git -C "${repo_path}" ls-remote --heads origin "${start_point}") ]]; then
+        echo Starting point is ${start_point}, which is a remote branch.
     else
         echo ${start_point} is neither a commit ID, a tag, nor a branch.
         exit 1
@@ -98,15 +94,34 @@ function create_release_branch() {
     local release_branch=$2
     local start_point=$3
     local repo_path=$(get_local_repo_path ${repo_name})
-    # pull remote
+
+    # fetch origin
+    echo "Fetch origin ${start_point}"
+    git -C ${repo_path} fetch origin ${start_point}:${start_point}
+    # switch to release branch
+    echo "Checkout origin ${start_point}"
+    git -C ${repo_path} checkout -B ${release_branch} origin/${start_point}
+    git -C ${repo_path} status
+    # pull origin
+    echo "Pull origin ${start_point}"
     git -C ${repo_path} pull origin ${start_point}
     git -C ${repo_path} status
-    # switch to release branch
-    git -C ${repo_path} checkout -B ${release_branch} ${start_point}
-    git -C ${repo_path} status
-    # and immediately push it to remote
-    git -C ${repo_path} push -f origin ${release_branch}
-    git -C ${repo_path} status
+
+    local remote_ref=$(
+        git -C ${repo_path} ls-remote --heads origin "${release_branch}"
+    )
+    if [[ -n "${remote_ref}" ]]; then
+        echo "Remote branch exists ${release_branch} exists."
+        echo "Found "${remote_ref}""
+    else
+        # push it to remote
+        # not sure if force pushing is necessary because of the if statement
+        # pitfall: what if we're restating a release that does not expect remote to exist?
+        # solution: delete remote manually before restarting
+        echo "Push to remote"
+        git -C ${repo_path} push -f origin ${release_branch}
+        git -C ${repo_path} status
+    fi
 }
 
 function get_default_branch_name() {
@@ -133,45 +148,71 @@ function commit_and_push_changes() {
     local release_branch=$2
     local message=$3
 
-    if ! (on_branch ${repo_name} ${release_branch}); then exit 1; fi
+    if ! (on_branch ${repo_name} ${release_branch}); then
+        exit 1
+    fi
     local repo_path=$(get_local_repo_path ${repo_name})
-    # stage changes (brute force, maybe too much)
-    git -C ${repo_path} add --all
-    git -C ${repo_path} status
-    # commit changes
-    git -C ${repo_path} commit -m "$message"
-    git -C ${repo_path} status
-    # push changes to remote
-    git -C ${repo_path} push -u origin ${release_branch}
-    git -C ${repo_path} status
+
+    if [[ -n $(git -C ${repo_path} diff) ]]; then
+        # stage changes (brute force, maybe too much)
+        git -C ${repo_path} add --all
+        git -C ${repo_path} status
+        # commit changes
+        git -C ${repo_path} commit -m "$message"
+        git -C ${repo_path} status
+        # push changes to remote
+        git -C ${repo_path} push -u origin ${release_branch}
+        git -C ${repo_path} status
+    fi
 }
 
 function branch_has_new_commits() {
     show_progress
     local repo_name=$1
-    local start_point=$2
-    local release_branch=$3
+    local release_branch=$2
     local repo_path=$(get_local_repo_path ${repo_name})
-    # is this really the best way?
-    echo "Checking if ${release_branch} has new commits on top of ${start_point}..."
-    if [ -n "$(git -C ${repo_path} log --oneline ${start_point}..${release_branch})" ]; then
-        echo "Found new commits"
+    local has_new_commits=$(
+        git -C ${repo_path} log --oneline origin/${release_branch}..${release_branch}
+    )
+    if [ -n "${has_new_commits}" ]; then
+        echo "Found new commits on local branch ${release_branch} \
+        compared to origin/${release_branch}"
         return 0
     else
-        echo "Could not find new commits"
+        echo "Could not find new commits on local branch ${release_branch} \
+        compared to origin/${release_branch}"
         return 1
     fi
 }
 
 function pull_request_exists() {
-    show_progress
+    #show_progress
     local repo_name=$1
     local release_branch=$2
     local repo=$(get_gh_repo_path ${repo_name})
-    # searching the list of open PRs does not return non-zero value if the search fails
-    # gh pr list --state open --search ${release_branch} >/dev/null 2>&1; echo $? # prints 0
-    # viewing an non-existent PR on the other hand does fail
-    gh pr view ${release_branch} --repo ${repo} >/dev/null 2>&1
+
+    # search the list of all PRs to check if the PR associated
+    # with the branch exists and retrieve its state
+    local is_closed=$(
+        gh pr list \
+            --state all \
+            --head ${release_branch} \
+            --repo ${repo} \
+            --json closed --jq '.[0].closed'
+    )
+
+    if [[ -z "${is_closed}" ]]; then
+        echo "Pull request does not exists"
+        return 1
+    fi
+
+    if [[ "${is_closed}" == "true" ]]; then
+        echo "Pull request exists: state = closed"
+        return 1
+    elif [[ "${is_closed}" == "false" ]]; then
+        echo "Pull request exists: state = open"
+        return 0
+    fi
 }
 
 function create_pull_request() {
@@ -181,9 +222,9 @@ function create_pull_request() {
     local tag=$3
     # do it only if new commits have been pushed to the branch
     # (avoids non-zero exist code from gh pr create)
-    if (branch_has_new_commits ${repo_name} ${start_point} ${release_branch}); then
-        #if (branch_has_new_commits ${repo_name} ${start_point} ${release_branch}) &&
-        #    ! (pull_request_exists ${repo_name} ${release_branch}); then
+    # if (branch_has_new_commits ${repo_name} ${release_branch}) &&
+    #     ! (pull_request_exists ${repo_name} ${release_branch}); then
+    if ! (pull_request_exists ${repo_name} ${release_branch}); then
         local repo=$(get_gh_repo_path ${repo_name})
         # different repos have different default branch names, such as master or main
         local base_branch=$(get_default_branch_name ${repo_name})
@@ -236,12 +277,14 @@ function create_release() {
     local tag=$3
     local repo=$(get_gh_repo_path ${repo_name})
 
-    if (gh release create ${tag} \
-        --repo ${repo} \
-        --target ${release_branch} \
-        --title ${tag} \
-        --generate-notes \
-        --latest); then
+    if (
+        gh release create ${tag} \
+            --repo ${repo} \
+            --target ${release_branch} \
+            --title ${tag} \
+            --generate-notes \
+            --latest
+    ); then
         return 0
     else
         return 1

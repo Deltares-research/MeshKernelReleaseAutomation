@@ -4,6 +4,7 @@ declare -gi github_refresh_interval=30 # seconds
 declare -gi delay=${github_refresh_interval}
 declare -g release_grid_editor_plugin=false
 declare -g dhydro_suite_version=""
+declare -g auto_merge=false
 declare -g upload_to_pypi=false
 declare -g pypi_access_token=""
 declare -g teamcity_access_token=""
@@ -39,6 +40,10 @@ function parse_arguments() {
         --start_point)
             declare -g start_point="$2"
             shift 2
+            ;;
+        --auto_merge)
+            auto_merge=true
+            shift
             ;;
         --github_access_token)
             declare -g github_access_token="$2"

@@ -21,6 +21,7 @@ Usage:
     [--release_grid_editor_plugin] \
     <--dhydro_suite_version DHYDRO_SUITE_VERSION> \
     <--start_point {main | master | latest | tag | branch | commit}> \
+    [--auto_merge] \
     <--github_access_token GITHUB_ACCESS_TOKEN> \
     [--upload_to_pypi] \
     [--pypi_access_token PYPI_ACCESS_TOKEN] \
@@ -37,6 +38,7 @@ Usage:
 | <nobr>--release_grid_editor_plugin</nobr> | Optional  | -         | Grid Editor plugin release switch        | If supplied, Grid Editor plugin is released beside MeshKernel, MeshKernelPy and MeshKernelNET |
 | --dhydro_suite_version                    | Dependent | string    | Version of D-HYDRO suite                 | Required if --release_grid_editor_plugin is provided, ignored otherwise                       |
 | --start_point                             | Required  | string    | ID of commit, branch or tag to check out | If a branch is specified, the HEAD of the branch is checked out                               |
+| --auto_merge                              | Optional  | -         | Auto-merge switch                        | If supplied, the release tag is merged into the base branch upon release creation             |
 | --github_access_token                     | Required  | string    | Path to github access token              |                                                                                               |
 | --upload_to_pypi                          | Optional  | -         | Upload to PyPi switch                    | If supplied, the generated python wheels are uploaded to PyPi                                 |
 | --pypi_access_token                       | Dependent | string    | Path to PyPi access token                | Required if --upload_to_pypi is provided, ignored otherwise                                   |

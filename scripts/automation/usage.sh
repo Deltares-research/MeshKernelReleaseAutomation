@@ -12,6 +12,7 @@ function usage {
     echo "                                                    Required if --release_grid_editor_plugin is provided, ignored otherwise"
     echo "  --start_point                 Required   string   ID of commit, branch or tag to check out"
     echo "                                                    If a branch is specified, the HEAD of the branch is checked out"
+    echo "  --auto_merge                  Optional   -        If supplied, the release tag is merged into the base branch upon release creation"
     echo "  --github_access_token         Required   string   Path to github access token"
     echo "  --upload_to_pypi              Optional            If supplied, the python wheels are uploaded to PyPi"
     echo "  --pypi_access_token           Dependent  string   Path to PyPi access token"
