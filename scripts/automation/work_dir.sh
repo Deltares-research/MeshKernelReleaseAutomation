@@ -5,7 +5,7 @@ function create_work_dir() {
     if [ -d "${work_dir}" ]; then
         rm -rf "${work_dir}"
     fi
-    mkdir ${work_dir}
+    mkdir -p ${work_dir}
 }
 
 function remove_work_dir() {
