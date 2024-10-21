@@ -96,8 +96,8 @@ function create_release_branch() {
     local repo_path=$(get_local_repo_path ${repo_name})
 
     # fetch origin
-    echo "Fetch origin ${start_point}"
-    git -C ${repo_path} fetch origin ${start_point}:${start_point}
+    echo "Fetch origin"
+    git -C ${repo_path} fetch origin
     # switch to release branch
     echo "Checkout origin ${start_point}"
     git -C ${repo_path} checkout -B ${release_branch} origin/${start_point}
