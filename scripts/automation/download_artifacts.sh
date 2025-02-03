@@ -132,11 +132,11 @@ function download_msi() {
                 --teamcity_access_token ${teamcity_access_token}
         )
 
-        local msi_file_name="D-GridEditor ${dhydro_suite_version} Stand-alone (${grideditorplugin_build_number}).msi"
+        local msi_file_name="D-GridEditor ${dhydro_suite_version} (${grideditorplugin_build_number}).msi"
 
         python ${scripts_path}/download_teamcity_artifact.py \
             --branch_name ${release_branch} \
-            --artifact_path "setup/GridEditor/bin/Release/stand-alone" \
+            --artifact_path "installer/setup/GridEditor/bin/Release/stand-alone" \
             --artifact_name "${msi_file_name}" \
             --build_config_id ${build_config_id} \
             --tag ${tag} \
