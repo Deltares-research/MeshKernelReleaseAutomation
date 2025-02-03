@@ -46,7 +46,7 @@ function upload_msi_to_github() {
     if ${release_grid_editor_plugin}; then
         local grideditorplugin_repo=$(get_gh_repo_path ${repo_name_GridEditorPlugin})
         gh release upload \
-            ${tag} ${work_dir}/artifacts/msi/GridEditor*.msi \
+            ${tag} ${work_dir}/artifacts/msi/D-GridEditor*.msi \
             --repo ${grideditorplugin_repo} \
             --clobber
     fi
