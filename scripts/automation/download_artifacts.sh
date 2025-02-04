@@ -124,7 +124,7 @@ function download_msi() {
 
     # GridEditorPlugin
     if ${release_grid_editor_plugin}; then
-        local build_config_id="GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_Installers_DGridEditorSignedMsiSInstallers"
+        local build_config_id="GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_Installers_CreateMsiWithSignedDllS"
         local grideditorplugin_build_number=$(
             python ${scripts_path}/get_build_number.py \
                 --build_config_id ${build_config_id} \
@@ -132,7 +132,7 @@ function download_msi() {
                 --teamcity_access_token ${teamcity_access_token}
         )
 
-        local msi_file_name="D-GridEditor ${dhydro_suite_version} (${grideditorplugin_build_number}).msi"
+        local msi_file_name="D-Grid Editor ${dhydro_suite_version}   (${grideditorplugin_build_number}).msi"
 
         python ${scripts_path}/download_teamcity_artifact.py \
             --branch_name ${release_branch} \
