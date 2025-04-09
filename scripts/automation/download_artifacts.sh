@@ -124,7 +124,7 @@ function download_msi() {
 
     # GridEditorPlugin
     if ${release_grid_editor_plugin}; then
-        local build_config_id="GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_Installers_CreateMsiWithSignedDllS"
+        local build_config_id="GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_Installers_DGridEditorSignedMsiSInstallers"
         local grideditorplugin_build_number=$(
             python ${scripts_path}/get_build_number.py \
                 --build_config_id ${build_config_id} \
