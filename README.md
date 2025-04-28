@@ -5,12 +5,31 @@ This repository contains bash and python scripts for the the release automation 
 ## Usage
 
 It is assumed below that the release script is run from the root directory of the repository.
+It is also assumed that Miniconda or Anaconda is installed on your Linux distribution.
 
 To display the usage, use
 
 ```bash
 ./scripts/automation/release.sh --help
 ```
+The file `./scripts/globals.sh` contains global variables used across all scripts. To work with test branches 
+and simulate a release, set the `repo_owner` and `forked_repo_suffix` variables as follows:
+
+```bash
+declare -g repo_owner="Deltares-research"
+declare -g forked_repo_suffix="Test"
+```
+To work with production branches, set the `repo_owner` and `forked_repo_suffix` variables as follows:
+```bash
+declare -g repo_owner="Deltares"
+declare -g forked_repo_suffix=""
+```
+The scripts clone Git repositories using SSH. To use SSH with `git clone`, you must set up SSH keys in your 
+GitHub account under **Settings** > **SSH and GPG keys**. 
+Additionally, Single Sign-On (SSO) must be configured for the key to authorize the Deltares and Deltares-Research organizations.
+
+GitHub tokens can be managed under **GitHub account** > **Developer settings** > **Personal access tokens** (classic). When generating a new token, ensure that SSO is configured to authorize Deltares and Deltares-Research.
+
 
 Usage:
 
