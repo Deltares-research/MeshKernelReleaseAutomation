@@ -110,9 +110,12 @@ function create_release_branch() {
     local remote_ref=$(
         git -C ${repo_path} ls-remote --heads origin "${release_branch}"
     )
+
+    # Pull the remote branch if exists
     if [[ -n "${remote_ref}" ]]; then
-        echo "Remote branch exists ${release_branch} exists."
+        echo "Remote branch ${release_branch} exists."
         echo "Found "${remote_ref}""
+	git -C ${repo_path} pull origin ${release_branch}
     else
         # push it to remote
         # not sure if force pushing is necessary because of the if statement
