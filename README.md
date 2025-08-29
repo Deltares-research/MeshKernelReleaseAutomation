@@ -1,123 +1,107 @@
 # MeshKernelReleaseAutomation
 
-This repository contains bash and python scripts for the the release automation of MeshKernel and its related products.
+This repository contains bash and python scripts for the release automation of MeshKernel and its related products.
 
 ## Preparation
 
 ### Conventions
 
-release_number: <major>.<minor>.<patch>
-release_label: v<release_label>
+release_number: <major>.<minor>.<patch>  
+release_label: v<release_label>  
 release_branch: release/<release_label>
 
 ### One-time setup
 
 #### Prerequisite software
 
-Install
+Install:
 
-* wsl
+* wsl (or git bash on Windows, or use Linux directly – the scripts are standard bash)
 * git
 * python
-* conda (miniconda)
-* gh
-* jq
-
-Note on installing gh: sudo apt install gh installed an old version of gh. Following commands succeeded in installing the latest version.
-
-   % type -p curl >/dev/null || sudo apt install curl -y
-   % curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-   % echo "deb [signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-   % sudo apt update
-   % sudo apt install gh -y
-   % gh --version
-
-Setup or copy your .gitconfig
+* miniconda
+* gh (GitHub CLI)
+* jq (JSON processor)
 
 #### Access tokens
 
 Get access tokens for:
-* teamcity
-   on https://dpcbuild.deltares.nl/profile.html?item=accessTokens
-   create token
-   save token in file (make sure it contains just the token, no newline)
 
-* github
-   - on wsl: create new ssh key
-     % ssh-keygen -t rsa -b 4096 -C "andreas.buykx@deltares.nl"
-   - copy public key
-   - goto https://github.com/settings/keys
-   - create new SSH key
-     create classic token
-     scopes: repo, workflow, admin:org
-   - paste the public key
-   - authorize Deltares and Deltares-Research (under Configure SSO)
+* **TeamCity**  
+   - Visit https://dpcbuild.deltares.nl/profile.html?item=accessTokens  
+   - Create token  
+   - Save the token in a file (ensure it contains only the token, no newline)
 
-* pypi
-   - create account (save recovery codes)
-   - 2FA authentication with authenticator
-   - create API token
+* **GitHub**  
+   - Visit https://github.com/settings/tokens
+   - Generate a classic token with scopes: `repo`, `workflow`, `admin:org`.  
+   - Save the token in a file
+   - Authorize Deltares and Deltares-Research (under Configure SSO).   
 
-* clone MeshKernelReleaseAutomation repository
+* **PyPI**  
+   - Create an account (save recovery codes).  
+   - Enable 2FA with an authenticator.  
+   - Create an API token with sufficient permissions to publish new releases.
+
+* Clone the `MeshKernelReleaseAutomation` repository.
+
+> **Important:** Before creating a release, ensure that **all TeamCity and GitHub pipelines are successful**. Any broken build will lead to release failure.
 
 ## Prepare for installing
 
-* start a wsl terminal
-* setup a conda environment on WSL
-   % . ~/setup_conda.sh
-   % conda activate base
-
 Two scenarios are supported:
-1. release from master
-2. patch release from prepared patch release branches
+1. Release from `master`
+2. Patch release from prepared patch release branches
 
 ### Release from master
 
-Run release script with --start_point master option
+Run the release script with the `--start_point master` option.
 
 ### Patch release
 
-For each repository (MeshKernel, MeshKernelNET, MeshKernelPy,
-GridEditor_Plugin) create a release branch.
+For each repository (MeshKernel, MeshKernelNET, MeshKernelPy, GridEditor_Plugin), create a release branch.
 
-Cherry-pick additional commits (use git cherry-pick -x <sha> to mention the original
-commit sha in the commit message) where appropriate.
+Cherry-pick additional commits (use `git cherry-pick -x <sha>` to mention the original commit sha in the commit message) where appropriate.
 
 Push release branches to remote.
 
-Run release script with --start_point <release_branch> option
+Run a release script with the `--start_point <release_branch>` option.
 
-### Post-script checks
+## Post-script checks
 
-#### TeamCity
-* MeshKernel
+After the release script completes, perform the following checks:
+
+### TeamCity
+* MeshKernel  
   - pinned and tagged signed NuGet package
-* MeshKernelNet
+* MeshKernelNet  
   - pinned and tagged signed NuGet package
-* GridEditor
-  - pinned and tagged D-Grid Editor Signed MSIs installer
+* GridEditor  
+  - pinned and tagged D-Grid Editor Signed MSIs installer  
   - pinned and tagged signed NuGet package
-* MeshKernelPy
-  - pinned and tagged python wheel both for linux and windows
+* MeshKernelPy  
+  - pinned and tagged Python wheel for Linux and Windows
 
 ### PyPI
-New release available on https://pypi.org/project/meshkernel/
+* Verify that a new release is available on https://pypi.org/project/meshkernel/
 
-#### Github
-* No open release pull requests on any repository
-* release branch including release tag merged back to main
+### GitHub
+* Verify that the desired release and tag have been created.
+* Verify that all release assets were correctly uploaded.
+* Ensure there are no open release pull requests on any repository.
+* Verify that the release branch and tag have been merged back to main.
 
 ## Usage
 
 It is assumed below that the release script is run from the root directory of the repository.
 
-To display the usage, use
+To display usage, run:
 
 ```bash
 ./scripts/automation/release.sh --help
 ```
 
-Usage:
+Example usage:
 
 ```bash
 ./scripts/automation/release.sh \
