@@ -124,7 +124,7 @@ function pin_and_tag_artifacts_GridEditorPlugin() {
             --last_successful_build \
             --teamcity_access_token ${teamcity_access_token}
     )
-    local msi_file_name="D-GridEditor ${dhydro_suite_version} (${grideditorplugin_msi_build_number}).msi"
+    local msi_file_name="D-GridEditor ${version} (${grideditorplugin_msi_build_number}).msi"
     python ${scripts_path}/pin_artifact.py \
         --branch_name ${release_branch} \
         --build_config_id GridEditor_GridEditorPlugin${forked_repo_suffix}_Deliverables_Installers_DGridEditorSignedMsiSInstallers \

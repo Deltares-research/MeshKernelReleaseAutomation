@@ -3,7 +3,6 @@
 declare -gi github_refresh_interval=30 # seconds
 declare -gi delay=${github_refresh_interval}
 declare -g release_grid_editor_plugin=false
-declare -g dhydro_suite_version=""
 declare -g auto_merge=false
 declare -g upload_to_pypi=false
 declare -g pypi_access_token=""
@@ -32,10 +31,6 @@ function parse_arguments() {
         --release_grid_editor_plugin)
             release_grid_editor_plugin=true
             shift
-            ;;
-        --dhydro_suite_version)
-            dhydro_suite_version="$2"
-            shift 2
             ;;
         --start_point)
             declare -g start_point="$2"
@@ -107,13 +102,6 @@ function parse_arguments() {
     if ${upload_to_pypi}; then
         if ! test -f "${pypi_access_token}"; then
             echo "Missing parameter --pypi_access_token: required when --upload_to_pypi is provided."
-            do_exit=true
-        fi
-    fi
-
-    if ${release_grid_editor_plugin}; then
-        if [[ -z ${dhydro_suite_version} ]]; then
-            echo "Missing parameter --dhydro_suite_version"
             do_exit=true
         fi
     fi
