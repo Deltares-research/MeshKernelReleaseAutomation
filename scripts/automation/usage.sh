@@ -8,8 +8,6 @@ function usage {
     echo "  --version                     Required   string   Semantic version of new release"
     echo "  --release_grid_editor_plugin  Optional   -        If supplied, Grid Editor plugin is released beside"
     echo "                                                    MeshKernel, MeshKernelPy and MeshKernelNET."
-    echo "  --dhydro_suite_version        Dependent  string   Version of D-HYDRO suite"
-    echo "                                                    Required if --release_grid_editor_plugin is provided, ignored otherwise"
     echo "  --start_point                 Required   string   ID of commit, branch or tag to check out"
     echo "                                                    If a branch is specified, the HEAD of the branch is checked out"
     echo "  --auto_merge                  Optional   -        If supplied, the release tag is merged into the base branch upon release creation"

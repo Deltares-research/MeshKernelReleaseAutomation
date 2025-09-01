@@ -95,9 +95,8 @@ function update_GridEditorPlugin() {
     python ${scripts_path}//bump_gep_msi_version.py \
         --wix_ui_variables_file ${dir_wix_config}/WixUI/WixUIVariables.wxl \
         --wix_proj_file ${dir_wix_config}/GridEditor.wixproj \
-        --to_release_version ${version} \
-        --to_public_release_version ${dhydro_suite_version}
+        --to_release_version ${version}
 
     commit_and_push_changes ${repo_name} ${release_branch} \
-        "Release v${version} auto-update: bump versions of wix configuration"
+        "Release v${version} auto-update: bump version of wix configuration"
 }

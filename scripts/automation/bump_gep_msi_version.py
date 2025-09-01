@@ -34,13 +34,6 @@ def parse_args() -> Path:
         help="The release version (same as version of Grid Editor plugin)",
     )
 
-    parser.add_argument(
-        "--to_public_release_version",
-        type=str,
-        required=True,
-        help="The public release version (D-HYDRO version).",
-    )
-
     return parser.parse_args()
 
 
@@ -80,11 +73,9 @@ class WiXUIVariableVersions(ReleaseVersions):
         self,
         wix_ui_variables_file: Path,
         to_release_version: str,
-        to_public_release_version: str,
     ):
         super().__init__(wix_ui_variables_file)
         self.to_release_version = to_release_version
-        self.to_public_release_version = to_public_release_version
         self.__bump_version()
         self._override()
 
@@ -107,10 +98,6 @@ class WiXUIVariableVersions(ReleaseVersions):
         self.__modify_attribute(
             "ReleaseVersion",
             self.to_release_version,
-        )
-        self.__modify_attribute(
-            "PublicReleaseVersion",
-            self.to_public_release_version,
         )
 
 
@@ -161,8 +148,7 @@ if __name__ == "__main__":
 
         WiXUIVariableVersions(
             args.wix_ui_variables_file,
-            args.to_release_version,
-            args.to_public_release_version,
+            args.to_release_version
         )
 
         WiXProjVersions(
