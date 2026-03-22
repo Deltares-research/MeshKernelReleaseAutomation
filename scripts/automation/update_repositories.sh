@@ -91,10 +91,9 @@ function update_GridEditorPlugin() {
         "Release v${version} auto-update: bump versions of dependencies"
 
     # bump msi versions
-    local dir_wix_config=${work_dir}/${repo_name}/setup/GridEditor
+    local setup_dir=${work_dir}/${repo_name}/setup
     python ${scripts_path}//bump_gep_msi_version.py \
-        --wix_ui_variables_file ${dir_wix_config}/WixUI/WixUIVariables.wxl \
-        --wix_proj_file ${dir_wix_config}/GridEditor.wixproj \
+        --wix_ui_variables_file ${setup_dir}/WixUIVariables.wxl \
         --to_release_version ${version}
 
     commit_and_push_changes ${repo_name} ${release_branch} \
