@@ -21,13 +21,6 @@ def parse_args() -> Path:
     )
 
     parser.add_argument(
-        "--wix_proj_file",
-        type=Path,
-        required=True,
-        help="Path to the wix project file.",
-    )
-
-    parser.add_argument(
         "--to_release_version",
         type=str,
         required=True,
@@ -100,47 +93,6 @@ class WiXUIVariableVersions(ReleaseVersions):
             self.to_release_version,
         )
 
-
-class WiXProjVersions(ReleaseVersions):
-    def __init__(
-        self,
-        wix_proj_file: Path,
-        # to_product_version: str,
-        to_release_version: str,
-    ):
-        super().__init__(wix_proj_file)
-        # self.to_product_version = to_product_version
-        self.to_release_version = to_release_version
-        self.__bump_version()
-        self._override()
-
-    def __modify_element(
-        self,
-        element_name: str,
-        value: str,
-    ) -> None:
-        element = self._tree.getroot().find(
-            f".//PropertyGroup/{element_name}", self._namespace
-        )
-
-        if element is not None:
-            element.text = value
-        else:
-            raise Exception(
-                f"{type(self).__name__}: Could not find element {element_name} in {self._xml_file}"
-            )
-
-    def __bump_version(self) -> None:
-        # self.__modify_element(
-        #     "ProductVersion",
-        #     self.to_product_version,
-        # )
-        self.__modify_element(
-            "ReleaseVersion",
-            self.to_release_version,
-        )
-
-
 if __name__ == "__main__":
     try:
         args = parse_args()
@@ -149,12 +101,6 @@ if __name__ == "__main__":
         WiXUIVariableVersions(
             args.wix_ui_variables_file,
             args.to_release_version
-        )
-
-        WiXProjVersions(
-            args.wix_proj_file,
-            # to_product_version: str,
-            args.to_release_version,
         )
 
     except Exception as error:
