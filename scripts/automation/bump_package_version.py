@@ -13,13 +13,6 @@ def parse_args() -> Path:
     parser = argparse.ArgumentParser()
 
     parser.add_argument(
-        "--nuspec_file",
-        type=Path,
-        required=True,
-        help="Path to the nuspec file.",
-    )
-
-    parser.add_argument(
         "--dir_build_props_file",
         type=Path,
         required=True,
@@ -38,6 +31,14 @@ def parse_args() -> Path:
         type=str,
         required=True,
         help="New version.",
+    )
+
+    parser.add_argument(
+        "--nuspec_file",
+        type=Path,
+        required=False,
+        default=None,
+        help="Path to the nuspec file.",
     )
 
     return parser.parse_args()
@@ -102,7 +103,8 @@ if __name__ == "__main__":
     try:
         args = parse_args()
         check_semantic_version(args.to_version)
-        bump_nuspec_version(args.nuspec_file, args.to_version)
+        if args.nuspec_file is not None:
+            bump_nuspec_version(args.nuspec_file, args.to_version)
         bump_dir_build_props_version(
             args.dir_build_props_file, args.version_tag, args.to_version
         )

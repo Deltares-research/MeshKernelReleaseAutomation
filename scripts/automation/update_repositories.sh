@@ -35,10 +35,8 @@ function update_MeshKernelNET() {
     local release_branch=$2
 
     # bump product version
-    local nuspec_file=${work_dir}/${repo_name}/nuget/MeshKernelNET.nuspec
     local dir_build_props_file=${work_dir}/${repo_name}/Directory.Build.props
     python ${scripts_path}/bump_package_version.py \
-        --nuspec_file ${nuspec_file} \
         --dir_build_props_file ${dir_build_props_file} \
         --version_tag "MeshKernelNETVersion" \
         --to_version ${version}
