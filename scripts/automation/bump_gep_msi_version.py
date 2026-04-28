@@ -72,7 +72,7 @@ class WiXUIVariableVersions(ReleaseVersions):
         self.__bump_version()
         self._override()
 
-    def __modify_attribute(
+    def __modify_attribute_value(
         self,
         attribute: str,
         value: str,
@@ -81,14 +81,14 @@ class WiXUIVariableVersions(ReleaseVersions):
             f".//String[@Id='{attribute}']", self._namespace
         )
         if element is not None:
-            element.text = value
+            element.set("Value", value)
         else:
             raise Exception(
                 f"{type(self).__name__}: Could not find ID {attribute} in {self._xml_file}"
             )
 
     def __bump_version(self) -> None:
-        self.__modify_attribute(
+        self.__modify_attribute_value(
             "ReleaseVersion",
             self.to_release_version,
         )
