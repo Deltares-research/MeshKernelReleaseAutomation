@@ -43,6 +43,7 @@ from these builds for publication on GitHub and PyPI.
 - [ ] Create `release/vX.Y.Z` in each participating repository from its agreed
   starting revision and push it. For a patch release, start from the appropriate
   previous release and cherry-pick approved fixes.
+- [ ] Open release pull requests targeting the repositories' default branches. Follow the repositories' PR naming conventions.
 
 ### MeshKernel
 
@@ -72,7 +73,7 @@ from these builds for publication on GitHub and PyPI.
 - [ ] Verify that the wheel builds use MeshKernel backend version `X.Y.Z`.
 - [ ] Wait for the Windows and Linux TeamCity wheel builds and the macOS
   GitHub Actions workflow `Build and test (release)` on the release branch
-  to pass.
+  and required pull request checks to pass.
 - [ ] Pin and tag the Windows and Linux wheel builds with `vX.Y.Z`.
 
 
@@ -119,8 +120,7 @@ Mark this entire section not applicable for a libraries-only release.
 
 ### Completion
 
-- [ ] Prepare release pull requests targeting the appropriate default branches
-  and obtain review. Follow the repositories' PR naming conventions. For an
+- [ ] Have the release pull requests reviewed and approved before merging. For an
   older patch release, agree which changes should be backported instead of
   merging older version/dependency values into current development.
 - [ ] Merge the approved release changes back into each repository's default
