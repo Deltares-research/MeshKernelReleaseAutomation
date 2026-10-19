@@ -34,7 +34,7 @@ from these builds for publication on GitHub and PyPI.
 
 ### Preparation
 
-- [ ] Agree the release version. Decide whether this is the latest supported
+- [ ] Agree on the release version. Decide whether this is the latest supported
   release or a patch of an older release.
 - [ ] If Grid Editor is included, review whether the user manual needs updates
   for the changes in this release and arrange any required updates.
@@ -79,7 +79,7 @@ from these builds for publication on GitHub and PyPI.
 
 ### Grid Editor (optional)
 
-Mark this entire section not applicable for a libraries-only release.
+Mark this entire section as not applicable for a libraries-only release.
 
 - [ ] Set `GridEditorPluginFileVersion` to `X.Y.Z` in `Directory.Build.props`
   and the package metadata version to `X.Y.Z` in
