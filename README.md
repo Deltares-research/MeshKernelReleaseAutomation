@@ -2,6 +2,11 @@
 
 This repository contains bash and python scripts for the release automation of MeshKernel and its related products.
 
+For a manual release, follow the [MeshKernel / Grid Editor release checklist](RELEASE_CHECKLIST.md).
+It covers releasing MeshKernel, MeshKernelNET, MeshKernelPy and optionally Grid Editor
+without running the automation scripts, including version updates, builds, artifact
+publication on GitHub and PyPI, and merging release changes back.
+
 ## Preparation
 
 ### Conventions
