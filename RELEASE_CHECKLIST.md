@@ -123,10 +123,11 @@ Mark this entire section as not applicable for a libraries-only release.
 - [ ] Have the release pull requests reviewed and approved before merging. For an
   older patch release, agree which changes should be backported instead of
   merging older version/dependency values into current development.
-- [ ] Merge the approved release changes back into each repository's default
-  branch, or backport the agreed changes for a patch release. Include all
-  required version/dependency changes and any build-generated commits. Resolve
-  conflicts deliberately and close the associated release PRs.
+- [ ] For a new 'latest' release based off the default branch, merge the release branch back
+into the default branch with a merge commit in order to make the release tag visible
+from the head of the default branch. For a patch release, backport the agreed changes
+into the default branch. Include all required version/dependency changes and any
+build-generated commits. Resolve conflicts deliberately and close the associated release PRs.
 - [ ] Keep the `release/vX.Y.Z` branches after merging. Do not delete them
   through the pull requests; repository policy protects these branches.
 - [ ] Confirm the required default-branch builds and checks pass after merging.
